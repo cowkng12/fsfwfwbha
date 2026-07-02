@@ -42,6 +42,7 @@ export function App() {
     const pairs = items.filter((item) => item.image_url).map((item) => [item.collection_name, item.image_url!] as const);
     return new Map(pairs);
   }, [items]);
+  const imagePool = useMemo(() => items.map((item) => item.image_url).filter((image): image is string => Boolean(image)), [items]);
 
   const applyFilter = (key: keyof FilterState, values: string[]) => {
     setFilters((current) => ({ ...current, [key]: values }));
@@ -67,6 +68,7 @@ export function App() {
           type={activeSheet}
           catalog={catalog}
           collectionImages={collectionImages}
+          imagePool={imagePool}
           selected={filters[activeSheet]}
           onClose={() => setActiveSheet(null)}
           onApply={(values) => applyFilter(activeSheet, values)}

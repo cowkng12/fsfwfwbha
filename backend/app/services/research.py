@@ -25,6 +25,12 @@ class ResearchService:
                     normalized.extend(self._normalize_gift(gift, name) for gift in gifts)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
+            if not any(item.get("image_url") for item in normalized):
+                try:
+                    gifts = await self.mrkt.saling([])
+                    normalized.extend(self._normalize_gift(gift, self._pick(gift, "collectionName", "collection", "giftName") or "MRKT Gift") for gift in gifts)
+                except Exception as exc:
+                    self.runs.add("mrkt", "error", f"fallback: {exc}")
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count

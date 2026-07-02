@@ -53,7 +53,7 @@ def results(
     repo: ListingRepository = Depends(listing_repo),
 ):
     filters = FilterRequest(
-        collection_names=parse_multi(collectionNames) or default_collection_names(),
+        collection_names=parse_multi(collectionNames),
         backdrop_names=parse_multi(backdropNames),
         model_names=parse_multi(modelNames),
         limit=limit,
