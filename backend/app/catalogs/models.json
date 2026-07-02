@@ -1,0 +1,17 @@
+[
+  {"name":"Beret","image":"/assets/model/beret.svg","rarity":0.9},
+  {"name":"Bumblebee","image":"/assets/model/bumblebee.svg","rarity":0.7},
+  {"name":"Lady Bits","image":"/assets/model/lady-bits.svg","rarity":0.8},
+  {"name":"Megavolt","image":"/assets/model/megavolt.svg","rarity":0.6},
+  {"name":"Sweet Kiss","image":"/assets/model/sweet-kiss.svg","rarity":1.1},
+  {"name":"Anniversary","image":"/assets/model/anniversary.svg","rarity":0.5},
+  {"name":"Art Project","image":"/assets/model/art-project.svg","rarity":0.7},
+  {"name":"Ring of Roots","image":"/assets/model/ring-of-roots.svg","rarity":0.3,"floorPrice":222.22},
+  {"name":"Asteroid","image":"/assets/model/asteroid.svg","rarity":0.4,"floorPrice":244},
+  {"name":"Goldsmith","image":"/assets/model/goldsmith.svg","rarity":0.4,"floorPrice":111},
+  {"name":"Hourglass","image":"/assets/model/hourglass.svg","rarity":0.8,"floorPrice":82},
+  {"name":"Neo Matrix","image":"/assets/model/neo-matrix.svg","rarity":0.8,"floorPrice":75},
+  {"name":"Spatial Grid","image":"/assets/model/spatial-grid.svg","rarity":0.8,"floorPrice":69},
+  {"name":"Fireball","image":"/assets/model/fireball.svg","rarity":1.2,"floorPrice":49.99},
+  {"name":"Highway","image":"/assets/model/highway.svg","rarity":1.2,"floorPrice":41}
+]

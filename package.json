@@ -1,0 +1,14 @@
+{
+  "name": "telegram-nft-research-miniapp",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace frontend run dev",
+    "build": "npm --workspace frontend run build",
+    "preview": "npm --workspace frontend run preview",
+    "backend": "python -m uvicorn app.main:app --reload --app-dir backend"
+  }
+}
