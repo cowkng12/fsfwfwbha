@@ -1,9 +1,9 @@
 [
-  {"id":"surge-board","name":"Surge Board","image":"/assets/nft/surge-board.svg"},
-  {"id":"heart-locked","name":"Heart Locked","image":"/assets/nft/heart-locked.svg"},
-  {"id":"heroic-helmet","name":"Heroic Helmet","image":"/assets/nft/heroic-helmet.svg"},
-  {"id":"ion-gem","name":"Ion Gem","image":"/assets/nft/ion-gem.svg"},
-  {"id":"kissed-frog","name":"Kissed Frog","image":"/assets/nft/kissed-frog.svg"},
-  {"id":"loot-bag","name":"Loot Bag","image":"/assets/nft/loot-bag.svg"},
-  {"id":"sharp-tongue","name":"Sharp Tongue","image":"/assets/nft/sharp-tongue.svg"}
+  {"id":"surge-board","name":"Surge Board","image":""},
+  {"id":"heart-locked","name":"Heart Locked","image":""},
+  {"id":"heroic-helmet","name":"Heroic Helmet","image":""},
+  {"id":"ion-gem","name":"Ion Gem","image":""},
+  {"id":"kissed-frog","name":"Kissed Frog","image":""},
+  {"id":"loot-bag","name":"Loot Bag","image":""},
+  {"id":"sharp-tongue","name":"Sharp Tongue","image":""}
 ]

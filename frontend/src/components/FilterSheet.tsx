@@ -4,6 +4,7 @@ import type { BackdropCatalogItem, Catalog, FilterState, ModelCatalogItem, NftCa
 type Props = {
   type: keyof FilterState;
   catalog: Catalog;
+  collectionImages: Map<string, string>;
   selected: string[];
   onClose: () => void;
   onApply: (values: string[]) => void;
@@ -15,7 +16,7 @@ const titles: Record<keyof FilterState, string> = {
   models: 'Модель'
 };
 
-export function FilterSheet({ type, catalog, selected, onClose, onApply }: Props) {
+export function FilterSheet({ type, catalog, collectionImages, selected, onClose, onApply }: Props) {
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<string[]>(selected);
   const rows = useMemo<Array<NftCatalogItem | BackdropCatalogItem | ModelCatalogItem>>(() => {
@@ -46,7 +47,7 @@ export function FilterSheet({ type, catalog, selected, onClose, onApply }: Props
           )}
           {rows.map((item, index) => (
             <button className="filter-item" key={item.name} onClick={() => toggle(item.name)}>
-              <Icon item={item} type={type} index={index} />
+              <Icon item={item} type={type} index={index} collectionImages={collectionImages} />
               <span className="item-main">
                 <b>{item.name}</b>
                 {type === 'nfts' && <small>23 июн.</small>}
@@ -68,9 +69,10 @@ export function FilterSheet({ type, catalog, selected, onClose, onApply }: Props
   );
 }
 
-function Icon({ item, type, index }: { item: NftCatalogItem | BackdropCatalogItem | ModelCatalogItem; type: keyof FilterState; index: number }) {
+function Icon({ item, type, index, collectionImages }: { item: NftCatalogItem | BackdropCatalogItem | ModelCatalogItem; type: keyof FilterState; index: number; collectionImages: Map<string, string> }) {
   if (type === 'backdrops' && 'color' in item) return <span className="color-icon" style={{ background: `radial-gradient(circle at 30% 20%, #fff4, transparent 35%), ${item.color}` }} />;
-  if ('image' in item) return <span className="mini-icon image-icon"><img src={item.image} alt="" /></span>;
+  const image = type === 'nfts' ? collectionImages.get(item.name) : null;
+  if (image) return <span className="mini-icon image-icon"><img src={image} alt="" /></span>;
   return <span className="mini-icon" style={{ background: gradients[index % gradients.length] }}>{item.name.slice(0, 1)}</span>;
 }
 

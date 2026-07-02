@@ -62,7 +62,7 @@ class ResearchService:
         if isinstance(data, dict):
             for key, value in data.items():
                 lowered = key.lower()
-                if isinstance(value, str) and value.startswith("http") and any(part in lowered for part in ("image", "photo", "preview", "thumb")):
+                if isinstance(value, str) and self._looks_like_image_url(value, lowered):
                     return value
                 found = self._image_url(value)
                 if found:
@@ -73,6 +73,14 @@ class ResearchService:
                 if found:
                     return found
         return None
+
+    def _looks_like_image_url(self, value: str, key: str) -> bool:
+        if not value.startswith("http"):
+            return False
+        lowered = value.lower()
+        if any(part in key for part in ("image", "photo", "preview", "thumb", "media", "picture")):
+            return True
+        return any(part in lowered for part in ("cdn.tgmrkt", "static", ".webp", ".png", ".jpg", ".jpeg", ".gif"))
 
 
 class DealAnalyzer:

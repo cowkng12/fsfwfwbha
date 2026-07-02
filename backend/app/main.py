@@ -1,3 +1,5 @@
+import asyncio
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +47,7 @@ def frontend(full_path: str):
 async def startup() -> None:
     init_db()
     await telegram_bot.set_webhook()
+    asyncio.create_task(research.run())
     scheduler.add_job(research.run, "interval", seconds=settings.research_interval_seconds, id="mrkt-research", max_instances=1)
     scheduler.start()
 

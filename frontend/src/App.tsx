@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchCatalog, fetchResults } from './api';
 import type { Catalog, FilterState, Listing } from './types';
 import { FilterSheet } from './components/FilterSheet';
@@ -20,8 +20,7 @@ export function App() {
 
   useEffect(() => {
     let ignore = false;
-    setLoading(true);
-    fetchResults(filters)
+    const load = () => fetchResults(filters)
       .then((data) => {
         if (!ignore) {
           setItems(data.items);
@@ -30,10 +29,19 @@ export function App() {
       })
       .catch(console.error)
       .finally(() => !ignore && setLoading(false));
+    setLoading(true);
+    load();
+    const timer = window.setInterval(load, 15000);
     return () => {
       ignore = true;
+      window.clearInterval(timer);
     };
   }, [filters]);
+
+  const collectionImages = useMemo(() => {
+    const pairs = items.filter((item) => item.image_url).map((item) => [item.collection_name, item.image_url!] as const);
+    return new Map(pairs);
+  }, [items]);
 
   const applyFilter = (key: keyof FilterState, values: string[]) => {
     setFilters((current) => ({ ...current, [key]: values }));
@@ -42,21 +50,13 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">@mrkt research</p>
-          <h1>NFT Gifts</h1>
-        </div>
-        <span className="status-dot" />
-      </header>
-
       <section className="filter-row">
         <button onClick={() => setActiveSheet('nfts')}>NFT <b>{filters.nfts.length || 'All'}</b></button>
         <button onClick={() => setActiveSheet('backdrops')}>Фон <b>{filters.backdrops.length || 'All'}</b></button>
         <button onClick={() => setActiveSheet('models')}>Модель <b>{filters.models.length || 'All'}</b></button>
       </section>
 
-      <ResultGrid catalog={catalog} items={items} loading={loading} />
+      <ResultGrid items={items} loading={loading} />
 
       <footer className="footer-note">
         Ресерч каждые 3 минуты{lastResearchAt ? ` • ${new Date(lastResearchAt).toLocaleTimeString()}` : ''}
@@ -66,6 +66,7 @@ export function App() {
         <FilterSheet
           type={activeSheet}
           catalog={catalog}
+          collectionImages={collectionImages}
           selected={filters[activeSheet]}
           onClose={() => setActiveSheet(null)}
           onApply={(values) => applyFilter(activeSheet, values)}
