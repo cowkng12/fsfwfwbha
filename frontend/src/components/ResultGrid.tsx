@@ -16,10 +16,10 @@ export function ResultGrid({ items, loading }: Props) {
           <div className="nft-art">
             <img src={item.image_url!} alt={item.collection_name} />
             <i>♣</i>
-            {item.deal_score > 0 && <em>{Math.round(item.deal_score)}%</em>}
           </div>
           <h2>{item.collection_name}</h2>
           <p>#{item.number ?? item.external_id.slice(0, 6)}</p>
+          <p className="traits">{[item.model_name, item.backdrop_name].filter(Boolean).join(' • ') || 'MRKT slot'}</p>
           <div className="price-row">
             <button>◆ {formatPrice(item.price)}</button>
             <a href={item.marketplace_url ?? '#'} aria-label="open listing">↳</a>

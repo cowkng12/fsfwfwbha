@@ -4,6 +4,7 @@ from hashlib import sha1
 from typing import Any
 
 from app.catalog import default_collection_names
+from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
 
@@ -17,6 +18,7 @@ class ResearchService:
 
     async def run(self, collection_names: list[str] | None = None) -> int:
         async with self._lock:
+            init_db()
             collections = collection_names or default_collection_names()
             normalized: list[dict] = []
             for name in collections:
@@ -27,8 +29,8 @@ class ResearchService:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
             if not any(item.get("image_url") for item in normalized):
                 try:
-                    gifts = await self.mrkt.saling([])
-                    normalized.extend(self._normalize_gift(gift, self._pick(gift, "collectionName", "collection", "giftName") or "MRKT Gift") for gift in gifts)
+                    gifts = await self.mrkt.saling(["Xmas Stocking"])
+                    normalized.extend(self._normalize_gift(gift, "Xmas Stocking") for gift in gifts)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"fallback: {exc}")
             count = self.listings.upsert_many(normalized)
@@ -46,9 +48,9 @@ class ResearchService:
             "collection_name": collection,
             "name": f"{collection} #{number}" if number else collection,
             "number": number,
-            "model_name": self._pick(gift, "modelName", "model"),
-            "backdrop_name": self._pick(gift, "backdropName", "backdrop", "backgroundName"),
-            "symbol_name": self._pick(gift, "symbolName", "symbol"),
+            "model_name": self._deep_pick(gift, "modelName", "model"),
+            "backdrop_name": self._deep_pick(gift, "backdropName", "backdrop", "backgroundName"),
+            "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
             "image_url": self._image_url(gift),
             "price": price,
             "marketplace_url": self._pick(gift, "url", "link"),
@@ -62,6 +64,25 @@ class ResearchService:
                 value = value.get("name") or value.get("url")
             if value not in (None, ""):
                 return value
+        return None
+
+    def _deep_pick(self, data: Any, *keys: str) -> Any:
+        if isinstance(data, dict):
+            for key in keys:
+                value = data.get(key)
+                if isinstance(value, dict):
+                    value = value.get("name") or value.get("title") or value.get("value") or value.get("url")
+                if value not in (None, ""):
+                    return value
+            for value in data.values():
+                found = self._deep_pick(value, *keys)
+                if found not in (None, ""):
+                    return found
+        if isinstance(data, list):
+            for item in data:
+                found = self._deep_pick(item, *keys)
+                if found not in (None, ""):
+                    return found
         return None
 
     def _image_url(self, data: Any) -> str | None:
