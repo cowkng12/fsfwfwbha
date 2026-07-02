@@ -70,6 +70,7 @@ export function FilterSheet({ type, catalog, selected, onClose, onApply }: Props
 
 function Icon({ item, type, index }: { item: NftCatalogItem | BackdropCatalogItem | ModelCatalogItem; type: keyof FilterState; index: number }) {
   if (type === 'backdrops' && 'color' in item) return <span className="color-icon" style={{ background: `radial-gradient(circle at 30% 20%, #fff4, transparent 35%), ${item.color}` }} />;
+  if ('image' in item) return <span className="mini-icon image-icon"><img src={item.image} alt="" /></span>;
   return <span className="mini-icon" style={{ background: gradients[index % gradients.length] }}>{item.name.slice(0, 1)}</span>;
 }
 

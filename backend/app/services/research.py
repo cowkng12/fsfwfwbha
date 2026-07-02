@@ -43,7 +43,7 @@ class ResearchService:
             "model_name": self._pick(gift, "modelName", "model"),
             "backdrop_name": self._pick(gift, "backdropName", "backdrop", "backgroundName"),
             "symbol_name": self._pick(gift, "symbolName", "symbol"),
-            "image_url": self._pick(gift, "image", "imageUrl", "photoUrl", "previewUrl"),
+            "image_url": self._image_url(gift),
             "price": price,
             "marketplace_url": self._pick(gift, "url", "link"),
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -56,6 +56,22 @@ class ResearchService:
                 value = value.get("name") or value.get("url")
             if value not in (None, ""):
                 return value
+        return None
+
+    def _image_url(self, data: Any) -> str | None:
+        if isinstance(data, dict):
+            for key, value in data.items():
+                lowered = key.lower()
+                if isinstance(value, str) and value.startswith("http") and any(part in lowered for part in ("image", "photo", "preview", "thumb")):
+                    return value
+                found = self._image_url(value)
+                if found:
+                    return found
+        if isinstance(data, list):
+            for item in data:
+                found = self._image_url(item)
+                if found:
+                    return found
         return None
 
 

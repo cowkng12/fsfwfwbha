@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from app.catalog import get_catalog
+from app.catalog import default_collection_names, get_catalog
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
 from app.services.research import DealAnalyzer, ResearchService
@@ -53,7 +53,7 @@ def results(
     repo: ListingRepository = Depends(listing_repo),
 ):
     filters = FilterRequest(
-        collection_names=parse_multi(collectionNames),
+        collection_names=parse_multi(collectionNames) or default_collection_names(),
         backdrop_names=parse_multi(backdropNames),
         model_names=parse_multi(modelNames),
         limit=limit,

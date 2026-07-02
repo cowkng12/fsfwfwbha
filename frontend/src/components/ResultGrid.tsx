@@ -9,7 +9,7 @@ export function ResultGrid({ catalog, items, loading }: Props) {
     collection_name: nft.name,
     name: nft.name,
     number: String(125000 + index * 731),
-    price: [3.73, 2.44, 17.2, 8.06, 112.89, 4.03, 6.68, 2.62, 35.07][index] ?? 5,
+    price: [8.06, 11.4, 14.2, 6.8, 9.9, 7.35, 12.5][index] ?? 5,
     floor_price: null,
     deal_score: 0,
     image_url: null,
@@ -17,6 +17,7 @@ export function ResultGrid({ catalog, items, loading }: Props) {
     updated_at: new Date().toISOString()
   })) ?? [];
   const visible = items.length ? items : fallback;
+  const imageByName = new Map(catalog?.nfts.map((nft) => [nft.name, nft.image]) ?? []);
 
   if (loading && !visible.length) return <div className="empty">Загружаем варианты...</div>;
 
@@ -25,7 +26,7 @@ export function ResultGrid({ catalog, items, loading }: Props) {
       {visible.map((item) => (
         <article className="nft-card" key={`${item.source}-${item.external_id}`}>
           <div className="nft-art">
-            {item.image_url ? <img src={item.image_url} alt="" /> : <span>{item.collection_name.slice(0, 2)}</span>}
+            <img src={item.image_url || imageByName.get(item.collection_name) || '/assets/nft/surge-board.svg'} alt={item.collection_name} />
             <i>♣</i>
             {item.deal_score > 0 && <em>{Math.round(item.deal_score)}%</em>}
           </div>
