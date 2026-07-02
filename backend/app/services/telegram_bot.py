@@ -62,5 +62,7 @@ class TelegramBotService:
         url = f"https://api.telegram.org/bot{self.settings.telegram_bot_token}/{method}"
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, json=payload)
+            if response.is_error:
+                logger.warning("Telegram API %s failed: %s", method, response.text)
             response.raise_for_status()
             return response.json()
