@@ -26,6 +26,8 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 3. В Render Dashboard заполните secret env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`.
 4. После первого деплоя укажите домен сервиса в `CORS_ORIGINS`, если Render выдаст другое имя.
 
+Для ответа бота на `/start` задайте `PUBLIC_BASE_URL` равным публичному URL Render-сервиса. Backend сам установит Telegram webhook при старте.
+
 ## API
 
 - `GET /api/health` - статус сервиса.

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     telegram_session: str | None = None
     telegram_bot_token: str | None = None
     telegram_alert_chat_id: str | None = None
+    telegram_webhook_secret: str | None = None
+    public_base_url: str | None = None
     mrkt_auth_token: str | None = Field(default=None, description="Optional cached MRKT token")
 
     @property

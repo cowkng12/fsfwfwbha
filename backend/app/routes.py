@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.catalog import get_catalog
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
 from app.services.research import DealAnalyzer, ResearchService
+from app.services.telegram_bot import TelegramBotService
 
 router = APIRouter(prefix="/api")
 
@@ -25,6 +26,12 @@ def research_service() -> ResearchService:
     from app.main import research
 
     return research
+
+
+def telegram_bot_service() -> TelegramBotService:
+    from app.main import telegram_bot
+
+    return telegram_bot
 
 
 @router.get("/health")
@@ -59,3 +66,16 @@ def results(
 async def run_research(service: ResearchService = Depends(research_service)):
     count = await service.run()
     return {"stored": count}
+
+
+@router.post("/telegram/webhook")
+async def telegram_webhook(
+    update: dict,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+    service: TelegramBotService = Depends(telegram_bot_service),
+):
+    expected = service.settings.telegram_webhook_secret
+    if expected and x_telegram_bot_api_secret_token != expected:
+        raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
+    await service.handle_update(update)
+    return {"ok": True}

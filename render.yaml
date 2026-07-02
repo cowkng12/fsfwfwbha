@@ -14,6 +14,8 @@ services:
         value: https://api.tgmrkt.io/api/v1
       - key: RESEARCH_INTERVAL_SECONDS
         value: 180
+      - key: PUBLIC_BASE_URL
+        value: https://fsfwfwbha.onrender.com
       - key: TELEGRAM_API_ID
         sync: false
       - key: TELEGRAM_API_HASH
@@ -23,6 +25,8 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_ALERT_CHAT_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
         sync: false
       - key: MRKT_AUTH_TOKEN
         sync: false

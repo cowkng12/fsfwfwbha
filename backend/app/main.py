@@ -11,9 +11,11 @@ from app.repositories import ListingRepository, ResearchRunRepository
 from app.routes import router
 from app.services.mrkt_client import MrktClient
 from app.services.research import ResearchService
+from app.services.telegram_bot import TelegramBotService
 
 settings = get_settings()
 research = ResearchService(MrktClient(settings), ListingRepository(), ResearchRunRepository())
+telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
 
 app = FastAPI(title="Telegram NFT Research API")
@@ -42,6 +44,7 @@ def frontend(full_path: str):
 @app.on_event("startup")
 async def startup() -> None:
     init_db()
+    await telegram_bot.set_webhook()
     scheduler.add_job(research.run, "interval", seconds=settings.research_interval_seconds, id="mrkt-research", max_instances=1)
     scheduler.start()
 
