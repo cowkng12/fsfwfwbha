@@ -79,3 +79,8 @@ async def telegram_webhook(
         raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
     await service.handle_update(update)
     return {"ok": True}
+
+
+@router.post("/telegram/set-webhook")
+async def set_telegram_webhook(service: TelegramBotService = Depends(telegram_bot_service)):
+    return await service.set_webhook()

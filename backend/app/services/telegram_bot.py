@@ -1,6 +1,9 @@
 import httpx
+import logging
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramBotService:
@@ -11,16 +14,20 @@ class TelegramBotService:
     def enabled(self) -> bool:
         return bool(self.settings.telegram_bot_token)
 
-    async def set_webhook(self) -> None:
+    async def set_webhook(self) -> dict:
         if not self.enabled or not self.settings.public_base_url:
-            return
+            return {"ok": False, "description": "TELEGRAM_BOT_TOKEN or PUBLIC_BASE_URL is missing"}
         payload = {
             "url": f"{self.settings.public_base_url.rstrip('/')}/api/telegram/webhook",
             "drop_pending_updates": True,
         }
         if self.settings.telegram_webhook_secret:
             payload["secret_token"] = self.settings.telegram_webhook_secret
-        await self._post("setWebhook", payload)
+        try:
+            return await self._post("setWebhook", payload)
+        except Exception as exc:
+            logger.warning("Telegram webhook setup failed: %s", exc)
+            return {"ok": False, "description": str(exc)}
 
     async def handle_update(self, update: dict) -> None:
         message = update.get("message") or update.get("edited_message")
