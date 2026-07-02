@@ -19,12 +19,12 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 
 ## Render
 
-Проект готов к деплою через Blueprint `render.yaml`.
+Проект готов к деплою одним Render Web Service через Blueprint `render.yaml`. FastAPI отдает API и собранный frontend из `frontend/dist`.
 
 1. Подключите GitHub репозиторий к Render.
 2. Создайте Blueprint из `render.yaml`.
 3. В Render Dashboard заполните secret env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`.
-4. После первого деплоя укажите домен frontend в `CORS_ORIGINS`, если Render выдаст другое имя сервиса.
+4. После первого деплоя укажите домен сервиса в `CORS_ORIGINS`, если Render выдаст другое имя.
 
 ## API
 
