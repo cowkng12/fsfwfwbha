@@ -63,12 +63,22 @@ class MrktClient:
             "query": None,
             "promotedFirst": False,
         }
-        headers = {"Authorization": await self.token(), "Referer": "https://cdn.tgmrkt.io/"}
+        headers = self._headers(await self.token())
         async with httpx.AsyncClient(timeout=45) as http:
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
             if response.status_code in {401, 403}:
                 self._token = None
-                headers["Authorization"] = await self._fetch_token_from_telegram()
+                headers = self._headers(await self._fetch_token_from_telegram())
                 response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
             response.raise_for_status()
         return response.json().get("gifts", [])
+
+    def _headers(self, token: str) -> dict[str, str]:
+        return {
+            "accept": "application/json, text/plain, */*",
+            "authorization": token,
+            "origin": "https://cdn.tgmrkt.io",
+            "referer": "https://cdn.tgmrkt.io/",
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
+        }
