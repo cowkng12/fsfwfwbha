@@ -6,7 +6,7 @@ export function ResultGrid({ items, loading }: Props) {
   const visible = items.filter((item) => item.image_url && item.price > 0);
 
   if (!visible.length) {
-    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Пока нет реальных слотов MRKT по выбранным фильтрам.'}</div>;
+    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Нет листингов до 100 TON или MRKT токен не авторизован.'}</div>;
   }
 
   return (

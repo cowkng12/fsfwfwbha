@@ -42,10 +42,6 @@ export function App() {
   return (
     <main className="app-shell">
       <section className="profile-card">
-        <div className="profile-title">
-          <span className="gem">💎</span>
-          <b>Премиум</b>
-        </div>
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
         <div className="budget-row">Бюджет: до 100 TON</div>
       </section>

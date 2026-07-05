@@ -16,9 +16,7 @@ button { border: 0; cursor: pointer; }
 .topbar h1 { margin: 0; font-size: 28px; line-height: 1; }
 .eyebrow { margin: 0 0 6px; color: #9aa0a0; font-size: 13px; }
 .status-dot { width: 12px; height: 12px; border-radius: 99px; background: #ffd51b; box-shadow: 0 0 22px #ffd51b; }
-.profile-card { background: #2c2d2c; border: 1px solid #424442; border-radius: 18px; padding: 22px 18px 20px; margin-bottom: 22px; box-shadow: inset 0 1px 0 #ffffff10; }
-.profile-title { display: flex; gap: 8px; align-items: center; color: #ffdf1b; font-size: 22px; font-weight: 900; margin-bottom: 22px; }
-.gem { filter: drop-shadow(0 0 10px #3b82f6); }
+.profile-card { background: #2c2d2c; border: 1px solid #424442; border-radius: 18px; padding: 24px 18px 22px; margin-bottom: 22px; box-shadow: inset 0 1px 0 #ffffff10; }
 .meter-row { display: grid; gap: 10px; margin: 14px 0; color: #e5e7eb; font-size: 18px; font-weight: 700; }
 .meter-row span { text-align: center; }
 .meter-row i { display: block; width: 0; min-width: 22px; height: 8px; border-radius: 999px; background: linear-gradient(90deg,#3b82f6,#ff7aa2); box-shadow: 0 0 12px #3b82f6aa; }
