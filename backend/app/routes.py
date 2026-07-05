@@ -28,6 +28,12 @@ def research_service() -> ResearchService:
     return research
 
 
+def mrkt_client():
+    from app.main import research
+
+    return research.mrkt
+
+
 def telegram_bot_service() -> TelegramBotService:
     from app.main import telegram_bot
 
@@ -76,6 +82,30 @@ def results(
 async def run_research(service: ResearchService = Depends(research_service)):
     count = await service.run()
     return {"stored": count}
+
+
+@router.get("/debug/mrkt")
+async def debug_mrkt(client=Depends(mrkt_client)):
+    settings = client.settings
+    result = {
+        "has_telegram_api_id": bool(settings.telegram_api_id),
+        "has_telegram_api_hash": bool(settings.telegram_api_hash),
+        "has_telegram_session": bool(settings.telegram_session),
+        "has_mrkt_auth_token": bool(settings.mrkt_auth_token),
+        "mrkt_max_price": settings.mrkt_max_price,
+    }
+    try:
+        token = await client.token()
+        gifts = await client.saling(["Xmas Stocking"], count=3, max_price=settings.mrkt_max_price)
+        result.update({
+            "token_ok": bool(token),
+            "gift_count": len(gifts),
+            "first_gift_keys": list(gifts[0].keys()) if gifts else [],
+            "first_gift": gifts[0] if gifts else None,
+        })
+    except Exception as exc:
+        result.update({"token_ok": False, "error": str(exc)})
+    return result
 
 
 @router.post("/telegram/webhook")
