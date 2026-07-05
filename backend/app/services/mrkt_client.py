@@ -1,6 +1,7 @@
 from urllib.parse import unquote
 
 import httpx
+from curl_cffi.requests import AsyncSession
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.contacts import ResolveUsernameRequest
@@ -34,7 +35,7 @@ class MrktClient:
             web_view = await client(RequestAppWebViewRequest(peer=peer, app=app, platform="android"))
             init_data = unquote(web_view.url.split("tgWebAppData=", 1)[1].split("&tgWebAppVersion", 1)[0])
 
-        async with httpx.AsyncClient(timeout=30) as http:
+        async with AsyncSession(impersonate="chrome", timeout=30) as http:
             response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
             response.raise_for_status()
             token = response.json().get("token")
@@ -64,7 +65,7 @@ class MrktClient:
             "promotedFirst": False,
         }
         headers = self._headers(await self.token())
-        async with httpx.AsyncClient(timeout=45) as http:
+        async with AsyncSession(impersonate="chrome", timeout=45) as http:
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
             if response.status_code in {401, 403}:
                 self._token = None
