@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Iterable
 
+from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
 
@@ -62,6 +63,8 @@ class ListingRepository:
         if filters.model_names:
             where.append(f"model_name IN ({','.join(['?'] * len(filters.model_names))})")
             params.extend(filters.model_names)
+        where.append("price <= ?")
+        params.append(get_settings().mrkt_max_price)
 
         sql = "SELECT * FROM listings"
         if where:

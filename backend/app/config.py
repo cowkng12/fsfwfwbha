@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/app.sqlite3"
     cors_origins: str = "http://localhost:5173"
     mrkt_api_url: str = "https://api.tgmrkt.io/api/v1"
+    mrkt_max_price: float = 100
     research_interval_seconds: int = 180
 
     telegram_api_id: int | None = None

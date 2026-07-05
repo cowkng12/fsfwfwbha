@@ -23,13 +23,13 @@ class ResearchService:
             normalized: list[dict] = []
             for name in collections:
                 try:
-                    gifts = await self.mrkt.saling([name])
+                    gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
                     normalized.extend(self._normalize_gift(gift, name) for gift in gifts)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
             if not any(item.get("image_url") for item in normalized):
                 try:
-                    gifts = await self.mrkt.saling(["Xmas Stocking"])
+                    gifts = await self.mrkt.saling(["Xmas Stocking"], max_price=self.mrkt.settings.mrkt_max_price)
                     normalized.extend(self._normalize_gift(gift, "Xmas Stocking") for gift in gifts)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"fallback: {exc}")

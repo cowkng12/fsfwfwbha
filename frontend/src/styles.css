@@ -25,9 +25,8 @@ button { border: 0; cursor: pointer; }
 .meter-row::after { content: ''; display: block; height: 8px; border-radius: 999px; background: #414341; margin-top: -18px; z-index: 0; }
 .meter-row i { z-index: 1; }
 .meter-row.muted i { min-width: 0; width: 0; box-shadow: none; }
-.listing-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #2a2b2a; border-radius: 16px; padding: 6px; margin-bottom: 72px; }
-.listing-tabs button { min-height: 84px; border-radius: 12px; color: #bdbdbd; background: transparent; font-weight: 850; font-size: 20px; line-height: 1.15; }
-.listing-tabs .active { background: #4287f5; color: #fff; box-shadow: 0 0 14px #3b82f655; }
+.budget-row { margin-top: 16px; text-align: center; color: #dbeafe; font-size: 18px; font-weight: 900; }
+.section-title { display: inline-grid; place-items: center; min-width: 130px; height: 56px; padding: 0 24px; margin: 0 0 28px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 21px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .nft-card { min-width: 0; overflow: hidden; border-radius: 18px; background: #2b2c2b; border: 1px solid #343635; box-shadow: 0 14px 28px #0004; }
 .nft-card.is-new { border-color: #3b91ff; box-shadow: 0 0 0 1px #3b91ff, 0 0 24px #3b91ff33; }
@@ -40,11 +39,10 @@ button { border: 0; cursor: pointer; }
 .price-line { margin: 12px 0 8px; color: #dbeafe; font-size: 16px; font-weight: 900; }
 .open-link { color: #8bbcff; text-decoration: none; font-size: 13px; font-weight: 800; }
 .footer-note, .empty { color: #b7c0ca; text-align: center; margin-top: 22px; font-size: 16px; }
-.bottom-dock { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(92vw, 486px); display: grid; grid-template-columns: 56px 1fr 64px; align-items: center; gap: 10px; z-index: 15; pointer-events: none; }
+.bottom-dock { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(92vw, 486px); display: grid; grid-template-columns: 56px 1fr; align-items: center; gap: 10px; z-index: 15; pointer-events: none; }
 .avatar { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg,#111827,#4b5563); border: 2px solid #3f4548; color: #fff; font-weight: 900; pointer-events: auto; box-shadow: 0 10px 24px #0008; }
 .dock-search { height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: #2d2d2d; border: 1px solid #3a3a3a; border-radius: 34px; color: #a8a8a8; pointer-events: auto; box-shadow: 0 16px 34px #0009; }
 .dock-search input { width: 100%; background: transparent; border: 0; outline: 0; color: #fff; font-size: 18px; }
-.add-button { width: 64px; height: 64px; border-radius: 50%; background: #4287f5; color: #fff; font-size: 36px; font-weight: 800; pointer-events: auto; box-shadow: 0 12px 28px #3b82f666; }
 
 .sheet { position: fixed; inset: 0; z-index: 20; background: #000b; display: flex; justify-content: center; }
 .sheet-panel { width: min(100%, 468px); height: 100%; background: #080c0c; border-radius: 18px 18px 0 0; padding: 8px 8px 18px; display: flex; flex-direction: column; box-shadow: 0 -16px 60px #ffffff12; }
