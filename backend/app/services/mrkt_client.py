@@ -71,8 +71,14 @@ class MrktClient:
                 self._token = None
                 headers = self._headers(await self._fetch_token_from_telegram())
                 response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
+            if response.status_code >= 400:
+                raise RuntimeError(f"MRKT saling failed {response.status_code}: {response.text[:300]}")
             response.raise_for_status()
-        return response.json().get("gifts", [])
+            try:
+                payload = response.json()
+            except Exception:
+                raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
+        return payload.get("gifts", [])
 
     def _headers(self, token: str) -> dict[str, str]:
         return {
