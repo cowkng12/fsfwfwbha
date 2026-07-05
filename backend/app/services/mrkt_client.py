@@ -1,6 +1,11 @@
 from urllib.parse import unquote
 
 import httpx
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+from telethon.tl.functions.contacts import ResolveUsernameRequest
+from telethon.tl.functions.messages import RequestAppWebViewRequest
+from telethon.tl.types import InputBotAppShortName, InputPeerUser, InputUser
 
 from app.config import Settings
 
@@ -14,22 +19,19 @@ class MrktClient:
         if not self.settings.telegram_api_id or not self.settings.telegram_api_hash or not self.settings.telegram_session:
             raise RuntimeError("MRKT auth requires TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION")
 
-        from pyrogram import Client
-        from pyrogram.raw.functions.messages import RequestAppWebView
-        from pyrogram.raw.types import InputBotAppShortName, InputUser
-
-        async with Client(
-            name="mrkt_research",
-            api_id=self.settings.telegram_api_id,
-            api_hash=self.settings.telegram_api_hash,
-            session_string=self.settings.telegram_session,
-            in_memory=True,
+        async with TelegramClient(
+            StringSession(self.settings.telegram_session),
+            self.settings.telegram_api_id,
+            self.settings.telegram_api_hash,
         ) as client:
-            bot_entity = await client.get_users("mrkt")
-            peer = await client.resolve_peer("mrkt")
-            bot = InputUser(user_id=bot_entity.id, access_hash=bot_entity.raw.access_hash)
-            bot_app = InputBotAppShortName(bot_id=bot, short_name="app")
-            web_view = await client.invoke(RequestAppWebView(peer=peer, app=bot_app, platform="android"))
+            if not await client.is_user_authorized():
+                raise RuntimeError("Telegram session is not authorized")
+            resolved = await client(ResolveUsernameRequest("mrkt"))
+            bot_user = resolved.users[0]
+            bot = InputUser(user_id=bot_user.id, access_hash=bot_user.access_hash)
+            peer = InputPeerUser(user_id=bot_user.id, access_hash=bot_user.access_hash)
+            app = InputBotAppShortName(bot_id=bot, short_name="app")
+            web_view = await client(RequestAppWebViewRequest(peer=peer, app=app, platform="android"))
             init_data = unquote(web_view.url.split("tgWebAppData=", 1)[1].split("&tgWebAppVersion", 1)[0])
 
         async with httpx.AsyncClient(timeout=30) as http:
