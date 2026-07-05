@@ -20,6 +20,11 @@ research = ResearchService(MrktClient(settings), ListingRepository(), ResearchRu
 telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
 
+
+async def research_job() -> None:
+    await research.run()
+    await telegram_bot.send_new_listing_alerts(ListingRepository())
+
 app = FastAPI(title="Telegram NFT Research API")
 app.add_middleware(
     CORSMiddleware,
@@ -47,8 +52,8 @@ def frontend(full_path: str):
 async def startup() -> None:
     init_db()
     await telegram_bot.set_webhook()
-    asyncio.create_task(research.run())
-    scheduler.add_job(research.run, "interval", seconds=settings.research_interval_seconds, id="mrkt-research", max_instances=1)
+    asyncio.create_task(research_job())
+    scheduler.add_job(research_job, "interval", seconds=settings.research_interval_seconds, id="mrkt-research", max_instances=1)
     scheduler.start()
 
 

@@ -38,10 +38,13 @@ class ResearchService:
             return count
 
     def _normalize_gift(self, gift: dict[str, Any], fallback_collection: str) -> dict:
-        collection = self._pick(gift, "collectionName", "collection", "giftName") or fallback_collection
-        number = str(self._pick(gift, "number", "giftNumber") or "") or None
+        collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or fallback_collection
+        number = str(self._deep_pick(gift, "number", "giftNumber", "num", "gift_num", "giftNum") or "") or None
         external_id = str(self._pick(gift, "id", "giftId", "slug") or sha1(repr(gift).encode()).hexdigest())
-        price = float(self._pick(gift, "price", "salePrice", "tonPrice") or 0)
+        price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
+        floor_price = self._price(gift, "floorPriceNanoTONsByCollection", "collectionFloor", "floorPrice")
+        model_floor_price = self._price(gift, "floorPriceNanoTONsByBackdropModel", "modelFloor", "backdropModelFloor")
+        now = datetime.now(timezone.utc).isoformat()
         return {
             "source": "mrkt",
             "external_id": external_id,
@@ -52,10 +55,30 @@ class ResearchService:
             "backdrop_name": self._deep_pick(gift, "backdropName", "backdrop", "backgroundName"),
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
             "image_url": self._image_url(gift),
-            "price": price,
-            "marketplace_url": self._pick(gift, "url", "link"),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "price": price or 0,
+            "floor_price": floor_price,
+            "model_floor_price": model_floor_price,
+            "marketplace_url": self._marketplace_url(gift),
+            "first_seen_at": now,
+            "updated_at": now,
         }
+
+    def _price(self, data: dict[str, Any], *keys: str) -> float | None:
+        value = self._deep_pick(data, *keys)
+        if value in (None, ""):
+            return None
+        price = float(value)
+        joined = " ".join(keys).lower()
+        if "nano" in joined or price > 1_000_000:
+            return round(price / 1_000_000_000, 4)
+        return price
+
+    def _marketplace_url(self, data: dict[str, Any]) -> str | None:
+        url = self._deep_pick(data, "url", "link")
+        if url:
+            return url
+        start_app = self._deep_pick(data, "startApp", "startapp", "startAppPayload", "slug", "id")
+        return f"https://t.me/mrkt/app?startapp={start_app}" if start_app else None
 
     def _pick(self, data: dict[str, Any], *keys: str) -> Any:
         for key in keys:
@@ -87,6 +110,9 @@ class ResearchService:
 
     def _image_url(self, data: Any) -> str | None:
         if isinstance(data, dict):
+            key = data.get("modelStickerThumbnailKey")
+            if isinstance(key, str) and key:
+                return f"https://cdn.tgmrkt.io/{key}"
             for key, value in data.items():
                 lowered = key.lower()
                 if isinstance(value, str) and self._looks_like_image_url(value, lowered):
@@ -116,7 +142,7 @@ class DealAnalyzer:
         for item in listings:
             floors[item.collection_name] = min(floors.get(item.collection_name, item.price), item.price)
         for item in listings:
-            item.floor_price = floors.get(item.collection_name)
+            item.floor_price = item.floor_price or floors.get(item.collection_name)
             if item.floor_price and item.price:
                 item.deal_score = round((item.floor_price / item.price) * 100, 2)
         return sorted(listings, key=lambda row: (row.collection_name, row.price))

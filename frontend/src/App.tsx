@@ -1,26 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchCatalog, fetchResults } from './api';
-import type { Catalog, FilterState, Listing } from './types';
-import { FilterSheet } from './components/FilterSheet';
+import { fetchResults } from './api';
+import type { Listing } from './types';
 import { ResultGrid } from './components/ResultGrid';
 
-const emptyFilters: FilterState = { nfts: [], backdrops: [], models: [] };
-
 export function App() {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [filters, setFilters] = useState<FilterState>(emptyFilters);
-  const [activeSheet, setActiveSheet] = useState<keyof FilterState | null>(null);
   const [items, setItems] = useState<Listing[]>([]);
   const [lastResearchAt, setLastResearchAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchCatalog().then(setCatalog).catch(console.error);
-  }, []);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let ignore = false;
-    const load = () => fetchResults(filters)
+    const load = () => fetchResults()
       .then((data) => {
         if (!ignore) {
           setItems(data.items);
@@ -36,44 +27,47 @@ export function App() {
       ignore = true;
       window.clearInterval(timer);
     };
-  }, [filters]);
+  }, []);
 
-  const collectionImages = useMemo(() => {
-    const pairs = items.filter((item) => item.image_url).map((item) => [item.collection_name, item.image_url!] as const);
-    return new Map(pairs);
-  }, [items]);
-  const imagePool = useMemo(() => items.map((item) => item.image_url).filter((image): image is string => Boolean(image)), [items]);
-
-  const applyFilter = (key: keyof FilterState, values: string[]) => {
-    setFilters((current) => ({ ...current, [key]: values }));
-    setActiveSheet(null);
-  };
+  const visibleItems = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return items;
+    return items.filter((item) => [item.collection_name, item.model_name, item.backdrop_name, item.number]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(normalized));
+  }, [items, query]);
 
   return (
     <main className="app-shell">
-      <section className="filter-row">
-        <button onClick={() => setActiveSheet('nfts')}>NFT <b>{filters.nfts.length || 'All'}</b></button>
-        <button onClick={() => setActiveSheet('backdrops')}>Фон <b>{filters.backdrops.length || 'All'}</b></button>
-        <button onClick={() => setActiveSheet('models')}>Модель <b>{filters.models.length || 'All'}</b></button>
+      <section className="profile-card">
+        <div className="profile-title">
+          <span className="gem">💎</span>
+          <b>Премиум</b>
+        </div>
+        <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
+        <div className="meter-row muted"><span>💰 Продажа: 0 / 500</span><i /></div>
+        <div className="meter-row muted"><span>🔄 Аренда: 0 / 500</span><i /></div>
       </section>
 
-      <ResultGrid items={items} loading={loading} />
+      <nav className="listing-tabs">
+        <button className="active">Листинг</button>
+        <button>Продажа</button>
+        <button>Сдано в аренду</button>
+      </nav>
+
+      <ResultGrid items={visibleItems} loading={loading} />
 
       <footer className="footer-note">
-        Ресерч каждые 3 минуты{lastResearchAt ? ` • ${new Date(lastResearchAt).toLocaleTimeString()}` : ''}
+        {lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ожидание первого ресерча'}
       </footer>
 
-      {catalog && activeSheet && (
-        <FilterSheet
-          type={activeSheet}
-          catalog={catalog}
-          collectionImages={collectionImages}
-          imagePool={imagePool}
-          selected={filters[activeSheet]}
-          onClose={() => setActiveSheet(null)}
-          onApply={(values) => applyFilter(activeSheet, values)}
-        />
-      )}
+      <div className="bottom-dock">
+        <div className="avatar">D</div>
+        <label className="dock-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
+        <button className="add-button">+</button>
+      </div>
     </main>
   );
 }

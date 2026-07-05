@@ -19,8 +19,9 @@ class ListingRepository:
                 """
                 INSERT INTO listings (
                     source, external_id, collection_name, name, number, model_name,
-                    backdrop_name, symbol_name, image_url, price, marketplace_url, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    backdrop_name, symbol_name, image_url, price, floor_price,
+                    model_floor_price, marketplace_url, first_seen_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -30,7 +31,10 @@ class ListingRepository:
                     symbol_name=excluded.symbol_name,
                     image_url=excluded.image_url,
                     price=excluded.price,
+                    floor_price=excluded.floor_price,
+                    model_floor_price=excluded.model_floor_price,
                     marketplace_url=excluded.marketplace_url,
+                    first_seen_at=COALESCE(listings.first_seen_at, excluded.first_seen_at),
                     updated_at=excluded.updated_at
                 """,
                 [
@@ -38,7 +42,8 @@ class ListingRepository:
                         row["source"], row["external_id"], row["collection_name"], row["name"],
                         row.get("number"), row.get("model_name"), row.get("backdrop_name"),
                         row.get("symbol_name"), row.get("image_url"), row["price"],
-                        row.get("marketplace_url"), row["updated_at"],
+                        row.get("floor_price"), row.get("model_floor_price"),
+                        row.get("marketplace_url"), row.get("first_seen_at"), row["updated_at"],
                     )
                     for row in rows
                 ],
@@ -61,12 +66,32 @@ class ListingRepository:
         sql = "SELECT * FROM listings"
         if where:
             sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY collection_name ASC, price ASC LIMIT ?"
+        sql += " ORDER BY first_seen_at DESC, updated_at DESC, price ASC LIMIT ?"
         params.append(filters.limit)
 
         with connect() as conn:
             rows = conn.execute(sql, params).fetchall()
-        return [Listing(**dict(row), floor_price=None, deal_score=0) for row in rows]
+        return [Listing(**dict(row), deal_score=0) for row in rows]
+
+    def find_unnotified(self, limit: int = 5) -> list[Listing]:
+        with connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM listings
+                WHERE notified_at IS NULL AND image_url IS NOT NULL AND price > 0
+                ORDER BY first_seen_at DESC, updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [Listing(**dict(row), deal_score=0) for row in rows]
+
+    def mark_notified(self, source: str, external_id: str) -> None:
+        with connect() as conn:
+            conn.execute(
+                "UPDATE listings SET notified_at = ? WHERE source = ? AND external_id = ?",
+                (utc_now(), source, external_id),
+            )
 
     def last_research_at(self) -> str | None:
         with connect() as conn:

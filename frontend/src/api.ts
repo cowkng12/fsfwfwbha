@@ -8,7 +8,9 @@ export async function fetchCatalog(): Promise<Catalog> {
   return response.json();
 }
 
-export async function fetchResults(filters: FilterState): Promise<{ items: Listing[]; last_research_at: string | null }> {
+const emptyFilters: FilterState = { nfts: [], backdrops: [], models: [] };
+
+export async function fetchResults(filters: FilterState = emptyFilters): Promise<{ items: Listing[]; last_research_at: string | null }> {
   const params = new URLSearchParams({ limit: '80' });
   filters.nfts.forEach((value) => params.append('collectionNames', value));
   filters.backdrops.forEach((value) => params.append('backdropNames', value));

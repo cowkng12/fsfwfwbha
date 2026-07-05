@@ -42,7 +42,11 @@ def init_db() -> None:
                 symbol_name TEXT,
                 image_url TEXT,
                 price REAL NOT NULL,
+                floor_price REAL,
+                model_floor_price REAL,
                 marketplace_url TEXT,
+                first_seen_at TEXT,
+                notified_at TEXT,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (source, external_id)
             );
@@ -59,3 +63,13 @@ def init_db() -> None:
             );
             """
         )
+        for statement in [
+            "ALTER TABLE listings ADD COLUMN floor_price REAL",
+            "ALTER TABLE listings ADD COLUMN model_floor_price REAL",
+            "ALTER TABLE listings ADD COLUMN first_seen_at TEXT",
+            "ALTER TABLE listings ADD COLUMN notified_at TEXT",
+        ]:
+            try:
+                conn.execute(statement)
+            except sqlite3.OperationalError:
+                pass
