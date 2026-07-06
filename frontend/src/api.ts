@@ -1,10 +1,17 @@
-import type { Catalog, FilterState, Listing } from './types';
+import type { Catalog, FilterState, GiftTraitCatalog, Listing } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 export async function fetchCatalog(): Promise<Catalog> {
   const response = await fetch(`${API_BASE}/api/catalog`);
   if (!response.ok) throw new Error('Cannot load catalog');
+  return response.json();
+}
+
+export async function fetchGiftTraits(collectionName: string): Promise<GiftTraitCatalog> {
+  const params = new URLSearchParams({ collectionName });
+  const response = await fetch(`${API_BASE}/api/catalog/traits?${params.toString()}`);
+  if (!response.ok) throw new Error('Cannot load gift traits');
   return response.json();
 }
 

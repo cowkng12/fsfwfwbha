@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
 from app.catalog import default_collection_names, get_catalog
@@ -49,6 +51,90 @@ def health():
 @router.get("/catalog")
 def catalog():
     return get_catalog()
+
+
+@router.get("/catalog/traits")
+async def catalog_traits(collectionName: str = Query(..., min_length=1), client=Depends(mrkt_client)):
+    collection_names = collection_search_names(collectionName)
+    try:
+        models, backdrops, symbols = await asyncio.gather(
+            client.gift_trait_options("models", collection_names),
+            client.gift_trait_options("backdrops", collection_names),
+            client.gift_trait_options("symbols", collection_names),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "models": sorted((normalize_model(item) for item in models), key=trait_sort_key),
+        "backdrops": sorted((normalize_backdrop(item) for item in backdrops), key=trait_sort_key),
+        "symbols": sorted((normalize_symbol(item) for item in symbols), key=trait_sort_key),
+    }
+
+
+def collection_search_names(collection_name: str) -> list[str]:
+    for item in get_catalog()["nfts"]:
+        if item.get("name") == collection_name:
+            return item.get("searchNames") or [collection_name]
+    return [collection_name]
+
+
+def normalize_model(item: dict) -> dict:
+    image_key = item.get("modelStickerThumbnailKey")
+    return {
+        "name": item.get("modelTitle") or item.get("modelName") or "",
+        "image": f"https://cdn.tgmrkt.io/{image_key}" if image_key else "",
+        "rarity": rarity_percent(item.get("rarityPerMille")),
+        "floorPrice": nano_ton(item.get("floorPriceNanoTons")),
+    }
+
+
+def normalize_backdrop(item: dict) -> dict:
+    name = item.get("backdropName") or ""
+    return {
+        "name": name,
+        "color": int_color(item.get("colorsCenterColor")) or "#2b2c2b",
+        "rarity": rarity_percent(item.get("rarityPerMille")) or static_backdrop_rarity(name),
+    }
+
+
+def normalize_symbol(item: dict) -> dict:
+    return {
+        "name": item.get("symbolName") or "",
+        "rarity": rarity_percent(item.get("rarityPerMille")),
+    }
+
+
+def rarity_percent(value) -> float:
+    try:
+        return round(float(value) / 10, 2)
+    except (TypeError, ValueError):
+        return 0
+
+
+def nano_ton(value) -> float | None:
+    try:
+        return round(float(value) / 1_000_000_000, 4) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def int_color(value) -> str | None:
+    try:
+        return f"#{int(value):06x}"
+    except (TypeError, ValueError):
+        return None
+
+
+def static_backdrop_rarity(name: str) -> float:
+    for item in get_catalog()["backdrops"]:
+        if item.get("name") == name:
+            return float(item.get("rarity") or 0)
+    return 0
+
+
+def trait_sort_key(item: dict) -> tuple[float, str]:
+    rarity = item.get("rarity") or 0
+    return (rarity if rarity > 0 else 999, item.get("name") or "")
 
 
 @router.get("/results", response_model=ResultsResponse)

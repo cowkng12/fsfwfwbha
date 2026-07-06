@@ -94,7 +94,7 @@ class TelegramBotService:
             "chat_id": self.settings.telegram_alert_chat_id,
             "text": text,
             "parse_mode": "HTML",
-            "disable_web_page_preview": False,
+            "disable_web_page_preview": True,
         }
         if listing.marketplace_url:
             payload["reply_markup"] = {"inline_keyboard": [[{"text": "Открыть лот", "url": listing.marketplace_url}]]}
@@ -163,7 +163,7 @@ class TelegramBotService:
 
     def _format_activity(self, listing: Listing) -> str:
         parts: list[str] = []
-        parts.extend(self._format_sale_activity(listing))
+        parts.append(self._format_listing_activity(listing))
         if listing.sales_count is not None:
             parts.append(f"Продаж MRKT: {listing.sales_count}")
         if listing.next_resale_at:
@@ -177,33 +177,10 @@ class TelegramBotService:
             parts.append("Нет данных активности")
         return "\n".join(parts)
 
-    def _format_sale_activity(self, listing: Listing) -> list[str]:
-        sales: list[tuple[str, str, str]] = []
-        if listing.last_sale_at and listing.last_sale_price is not None:
-            sales.append((
-                listing.last_sale_at,
-                "Продажа",
-                self._format_money(listing.last_sale_price, listing.last_sale_currency),
-            ))
-        if listing.initial_sale_at and (listing.initial_sale_price is not None or listing.initial_sale_stars is not None):
-            initial_price = (
-                self._format_money(listing.initial_sale_price, listing.initial_sale_currency)
-                if listing.initial_sale_price is not None
-                else "-"
-            )
-            stars = f" / {listing.initial_sale_stars} Stars" if listing.initial_sale_stars is not None else ""
-            sales.append((listing.initial_sale_at, "Первая", f"{initial_price}{stars}"))
-        sales.sort(key=lambda row: self._date_sort_key(row[0]), reverse=True)
-        return [
-            f"{index}. {label}: {price}, {self._format_days_ago(date)}"
-            for index, (date, label, price) in enumerate(sales[:5], start=1)
-        ]
-
-    def _format_money(self, value: float | None, currency: str | None) -> str:
-        if value is None:
-            return "-"
-        formatted = f"{value:,.2f}".replace(",", " ").rstrip("0").rstrip(".")
-        return f"{formatted} {currency or ''}".strip()
+    def _format_listing_activity(self, listing: Listing) -> str:
+        owner = listing.current_owner or "владелец неизвестен"
+        date = listing.last_sale_at or listing.first_seen_at or listing.updated_at
+        return f"1. {owner}: {self._format_ton(listing.price)} TON, {self._format_days_ago(date)}"
 
     def _format_date(self, value: str) -> str:
         parsed = self._parse_datetime(value)

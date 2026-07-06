@@ -1,11 +1,18 @@
 export type NftCatalogItem = { id: string; name: string; image: string };
 export type BackdropCatalogItem = { name: string; color: string; rarity: number };
 export type ModelCatalogItem = { name: string; image: string; rarity: number; floorPrice?: number };
+export type SymbolCatalogItem = { name: string; rarity: number };
 
 export type Catalog = {
   nfts: NftCatalogItem[];
   backdrops: BackdropCatalogItem[];
   models: ModelCatalogItem[];
+};
+
+export type GiftTraitCatalog = {
+  models: ModelCatalogItem[];
+  backdrops: BackdropCatalogItem[];
+  symbols: SymbolCatalogItem[];
 };
 
 export type Listing = {

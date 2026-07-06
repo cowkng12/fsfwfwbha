@@ -113,6 +113,24 @@ class MrktClient:
                 raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
         return payload
 
+    async def gift_trait_options(self, trait: str, collection_names: list[str]) -> list[dict]:
+        headers = self._headers(await self.token())
+        payload = {"collections": collection_names}
+        async with AsyncSession(impersonate="chrome", timeout=45) as http:
+            response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
+            if response.status_code in {401, 403}:
+                self._token = None
+                headers = self._headers(await self._fetch_token_from_telegram())
+                response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
+            if response.status_code >= 400:
+                raise RuntimeError(f"MRKT {trait} failed {response.status_code}: {response.text[:300]}")
+            response.raise_for_status()
+            try:
+                data = response.json()
+            except Exception:
+                raise RuntimeError(f"MRKT {trait} returned non-JSON {response.status_code}: {response.text[:300]}")
+        return data if isinstance(data, list) else []
+
     def _ton_to_nano(self, value: float | None) -> int | None:
         if value is None:
             return None
