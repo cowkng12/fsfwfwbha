@@ -16,6 +16,13 @@ class ListingRepository:
         if not rows:
             return 0
         with connect() as conn:
+            hidden = {
+                (row["source"], row["external_id"])
+                for row in conn.execute("SELECT source, external_id FROM hidden_items").fetchall()
+            }
+            rows = [row for row in rows if (row["source"], row["external_id"]) not in hidden]
+            if not rows:
+                return 0
             conn.executemany(
                 """
                 INSERT INTO listings (
@@ -65,6 +72,7 @@ class ListingRepository:
             params.extend(filters.model_names)
         where.append("price <= ?")
         params.append(get_settings().mrkt_max_price)
+        where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"
         if where:
@@ -81,7 +89,14 @@ class ListingRepository:
             rows = conn.execute(
                 """
                 SELECT * FROM listings
-                WHERE notified_at IS NULL AND image_url IS NOT NULL AND price > 0
+                WHERE notified_at IS NULL
+                  AND image_url IS NOT NULL
+                  AND price > 0
+                  AND NOT EXISTS (
+                    SELECT 1 FROM notified_items
+                    WHERE notified_items.source = listings.source
+                      AND notified_items.external_id = listings.external_id
+                  )
                 ORDER BY first_seen_at DESC, updated_at DESC
                 LIMIT ?
                 """,
@@ -92,9 +107,34 @@ class ListingRepository:
     def mark_notified(self, source: str, external_id: str) -> None:
         with connect() as conn:
             conn.execute(
+                "INSERT OR IGNORE INTO notified_items (source, external_id, created_at) VALUES (?, ?, ?)",
+                (source, external_id, utc_now()),
+            )
+            conn.execute(
                 "UPDATE listings SET notified_at = ? WHERE source = ? AND external_id = ?",
                 (utc_now(), source, external_id),
             )
+
+    def clear_feed(self, archive_current: bool = True) -> int:
+        with connect() as conn:
+            if archive_current:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO notified_items (source, external_id, created_at)
+                    SELECT source, external_id, ? FROM listings
+                    """,
+                    (utc_now(),),
+                )
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO hidden_items (source, external_id, created_at)
+                    SELECT source, external_id, ? FROM listings
+                    """,
+                    (utc_now(),),
+                )
+            row = conn.execute("SELECT COUNT(*) AS count FROM listings").fetchone()
+            conn.execute("DELETE FROM listings")
+        return int(row["count"] if row else 0)
 
     def last_research_at(self) -> str | None:
         with connect() as conn:

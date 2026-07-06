@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     mrkt_api_url: str = "https://api.tgmrkt.io/api/v1"
     mrkt_max_price: float = 50
+    mrkt_min_model_floor: float = 50
+    mrkt_min_gift_floor: float = 0
+    mrkt_premium_backdrops: str = (
+        "Black,White,Platinum,Silver,Electric Purple,Cyberpunk,Electric Indigo,Neon Blue,"
+        "Azure Blue,Sapphire,Sky Blue,Mint Green,Emerald,Malachite,Aquamarine,Pacific Green,"
+        "Lavender,Purple,Violet,Gold,Pure Gold,Satin Gold,Ruby,Crimson,Fuchsia,Magenta"
+    )
     research_interval_seconds: int = 180
 
     telegram_api_id: int | None = None
@@ -26,6 +33,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def premium_backdrop_list(self) -> list[str]:
+        return [item.strip() for item in self.mrkt_premium_backdrops.split(",") if item.strip()]
 
 
 @lru_cache

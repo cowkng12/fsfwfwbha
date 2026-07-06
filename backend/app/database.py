@@ -61,6 +61,20 @@ def init_db() -> None:
                 message TEXT,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS notified_items (
+                source TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (source, external_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS hidden_items (
+                source TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (source, external_id)
+            );
             """
         )
         for statement in [

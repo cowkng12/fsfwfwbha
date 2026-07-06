@@ -21,4 +21,7 @@ def get_catalog() -> dict[str, list[dict[str, Any]]]:
 
 
 def default_collection_names() -> list[str]:
-    return [item["name"] for item in get_catalog()["nfts"]]
+    names: list[str] = []
+    for item in get_catalog()["nfts"]:
+        names.extend(item.get("searchNames") or [item["name"]])
+    return list(dict.fromkeys(names))

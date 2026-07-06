@@ -84,6 +84,14 @@ async def run_research(service: ResearchService = Depends(research_service)):
     return {"stored": count}
 
 
+@router.post("/listings/clear")
+def clear_listings(confirm: bool = Query(default=False), repo: ListingRepository = Depends(listing_repo)):
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Pass confirm=true to clear listings")
+    deleted = repo.clear_feed(archive_current=True)
+    return {"deleted": deleted, "archived": True}
+
+
 @router.get("/debug/mrkt")
 async def debug_mrkt(client=Depends(mrkt_client)):
     settings = client.settings

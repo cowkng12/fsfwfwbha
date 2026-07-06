@@ -24,7 +24,9 @@ button { border: 0; cursor: pointer; }
 .meter-row i { z-index: 1; }
 .meter-row.muted i { min-width: 0; width: 0; box-shadow: none; }
 .budget-row { margin-top: 16px; text-align: center; color: #dbeafe; font-size: 18px; font-weight: 900; }
-.section-title { display: inline-grid; place-items: center; min-width: 130px; height: 56px; padding: 0 24px; margin: 0 0 28px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 21px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 28px; }
+.section-title { display: inline-grid; place-items: center; min-width: 130px; height: 56px; padding: 0 24px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 21px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
+.clear-button { height: 44px; padding: 0 16px; border-radius: 12px; background: #2b2c2b; border: 1px solid #484a48; color: #f3f4f6; font-weight: 850; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .nft-card { min-width: 0; overflow: hidden; border-radius: 18px; background: #2b2c2b; border: 1px solid #343635; box-shadow: 0 14px 28px #0004; }
 .nft-card.is-new { border-color: #3b91ff; box-shadow: 0 0 0 1px #3b91ff, 0 0 24px #3b91ff33; }

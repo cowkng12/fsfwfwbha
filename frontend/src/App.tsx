@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchResults } from './api';
+import { clearListings, fetchResults } from './api';
 import type { Listing } from './types';
 import { ResultGrid } from './components/ResultGrid';
 
@@ -39,6 +39,14 @@ export function App() {
       .includes(normalized));
   }, [items, query]);
 
+  const clearFeed = async () => {
+    const confirmed = window.confirm('Очистить текущую ленту? Уже найденные лоты будут добавлены в историю, чтобы бот не прислал их повторно.');
+    if (!confirmed) return;
+    await clearListings();
+    setItems([]);
+    setLastResearchAt(null);
+  };
+
   return (
     <main className="app-shell">
       <section className="profile-card">
@@ -46,7 +54,10 @@ export function App() {
         <div className="budget-row">Бюджет: до 50 TON</div>
       </section>
 
-      <div className="section-title">Листинг</div>
+      <div className="section-head">
+        <div className="section-title">Листинг</div>
+        <button className="clear-button" onClick={clearFeed}>Очистить</button>
+      </div>
 
       <ResultGrid items={visibleItems} loading={loading} />
 

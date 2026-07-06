@@ -27,7 +27,9 @@ class ResearchService:
                 try:
                     gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
                     for gift in gifts:
-                        normalized.append(await self._normalize_gift(gift, name))
+                        listing = await self._normalize_gift(gift, name)
+                        if self._is_quality_listing(listing):
+                            normalized.append(listing)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
             count = self.listings.upsert_many(normalized)
@@ -60,6 +62,21 @@ class ResearchService:
             "first_seen_at": now,
             "updated_at": now,
         }
+
+    def _is_quality_listing(self, listing: dict) -> bool:
+        if not listing.get("image_url") or not listing.get("price"):
+            return False
+        if listing["price"] > self.mrkt.settings.mrkt_max_price:
+            return False
+        gift_floor = listing.get("floor_price")
+        model_floor = listing.get("model_floor_price")
+        if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
+            return False
+        premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
+        backdrop = str(listing.get("backdrop_name") or "").lower()
+        has_premium_backdrop = backdrop in premium_backdrops
+        has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
+        return has_premium_backdrop or has_expensive_model
 
     async def _collection_floor(self, collection: str) -> float | None:
         if collection in self._collection_floor_cache:

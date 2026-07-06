@@ -19,3 +19,9 @@ export async function fetchResults(filters: FilterState = emptyFilters): Promise
   if (!response.ok) throw new Error('Cannot load results');
   return response.json();
 }
+
+export async function clearListings(): Promise<{ deleted: number; archived: boolean }> {
+  const response = await fetch(`${API_BASE}/api/listings/clear?confirm=true`, { method: 'POST' });
+  if (!response.ok) throw new Error('Cannot clear listings');
+  return response.json();
+}
