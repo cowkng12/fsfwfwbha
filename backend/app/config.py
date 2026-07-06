@@ -20,12 +20,15 @@ class Settings(BaseSettings):
         "Lavender,Purple,Violet,Gold,Pure Gold,Satin Gold,Ruby,Crimson,Fuchsia,Magenta"
     )
     research_interval_seconds: int = 180
+    keepalive_interval_seconds: int = 240
 
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
     telegram_session: str | None = None
     telegram_bot_token: str | None = None
     telegram_alert_chat_id: str | None = None
+    telegram_allowed_chat_ids: str | None = None
+    telegram_allowed_user_ids: str | None = None
     telegram_webhook_secret: str | None = None
     public_base_url: str | None = None
     cron_secret: str | None = None
@@ -38,6 +41,25 @@ class Settings(BaseSettings):
     @property
     def premium_backdrop_list(self) -> list[str]:
         return [item.strip() for item in self.mrkt_premium_backdrops.split(",") if item.strip()]
+
+    @property
+    def telegram_allowed_chat_id_set(self) -> set[int]:
+        return self._parse_int_set(self.telegram_allowed_chat_ids)
+
+    @property
+    def telegram_allowed_user_id_set(self) -> set[int]:
+        return self._parse_int_set(self.telegram_allowed_user_ids)
+
+    def _parse_int_set(self, value: str | None) -> set[int]:
+        if not value:
+            return set()
+        parsed: set[int] = set()
+        for item in value.split(","):
+            try:
+                parsed.add(int(item.strip()))
+            except ValueError:
+                continue
+        return parsed
 
 
 @lru_cache

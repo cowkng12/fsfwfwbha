@@ -28,7 +28,9 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 
 Для ответа бота на `/start` задайте `PUBLIC_BASE_URL` равным публичному URL Render-сервиса. Backend сам установит Telegram webhook при старте.
 
-Если Render-сервис засыпает, добавьте внешний cron/uptime check каждые 3-5 минут. Самый легкий вариант для поддержания процесса живым: `GET https://fsfwfwbha.onrender.com/api/health`. Вариант, который сразу запускает скан и алерты: `GET https://fsfwfwbha.onrender.com/api/cron/research?secret=<CRON_SECRET>`.
+Для whitelist задайте `TELEGRAM_ALLOWED_CHAT_IDS` и/или `TELEGRAM_ALLOWED_USER_IDS` через запятую. Если оба значения пустые, бот отвечает всем. Для личного чата Telegram `chat_id` обычно равен `user_id`.
+
+Backend делает self-ping по `PUBLIC_BASE_URL` каждые `KEEPALIVE_INTERVAL_SECONDS`, пока процесс уже запущен. Если Render-сервис все равно засыпает, добавьте внешний cron/uptime check каждые 3-5 минут. Самый легкий вариант для поддержания процесса живым: `GET https://fsfwfwbha.onrender.com/api/health`. Вариант, который сразу запускает скан и алерты: `GET https://fsfwfwbha.onrender.com/api/cron/research?secret=<CRON_SECRET>`.
 
 ## API
 

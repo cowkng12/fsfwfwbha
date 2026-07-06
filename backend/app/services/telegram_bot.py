@@ -23,7 +23,7 @@ class TelegramBotService:
             return {"ok": False, "description": "TELEGRAM_BOT_TOKEN or PUBLIC_BASE_URL is missing"}
         payload = {
             "url": f"{self.settings.public_base_url.rstrip('/')}/api/telegram/webhook",
-            "drop_pending_updates": True,
+            "drop_pending_updates": False,
         }
         if self.settings.telegram_webhook_secret:
             payload["secret_token"] = self.settings.telegram_webhook_secret
@@ -44,8 +44,19 @@ class TelegramBotService:
         chat_id = chat.get("id")
         if not chat_id:
             return
+        user_id = (message.get("from") or {}).get("id")
+        if not self._is_allowed(chat_id, user_id):
+            logger.info("Ignoring Telegram update from non-whitelisted chat=%s user=%s", chat_id, user_id)
+            return
         if text.startswith("/start"):
             await self.send_start(chat_id)
+
+    def _is_allowed(self, chat_id: int, user_id: int | None) -> bool:
+        allowed_chats = self.settings.telegram_allowed_chat_id_set
+        allowed_users = self.settings.telegram_allowed_user_id_set
+        if not allowed_chats and not allowed_users:
+            return True
+        return chat_id in allowed_chats or (user_id is not None and user_id in allowed_users)
 
     async def send_start(self, chat_id: int) -> None:
         app_url = (self.settings.public_base_url or "").rstrip("/")

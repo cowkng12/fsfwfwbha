@@ -1,5 +1,7 @@
 import asyncio
+import logging
 
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +18,7 @@ from app.services.research import ResearchService
 from app.services.telegram_bot import TelegramBotService
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 research = ResearchService(MrktClient(settings), ListingRepository(), ResearchRunRepository())
 telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
@@ -39,6 +42,17 @@ async def run_research_cycle() -> dict[str, int | bool]:
 
 async def research_job() -> None:
     await run_research_cycle()
+
+
+async def keepalive_job() -> None:
+    if not settings.public_base_url:
+        return
+    url = f"{settings.public_base_url.rstrip('/')}/api/health"
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            await client.get(url)
+    except Exception as exc:
+        logger.info("Keepalive ping failed: %s", exc)
 
 app = FastAPI(title="Telegram NFT Research API")
 app.add_middleware(
@@ -69,6 +83,8 @@ async def startup() -> None:
     await telegram_bot.set_webhook()
     asyncio.create_task(research_job())
     scheduler.add_job(research_job, "interval", seconds=settings.research_interval_seconds, id="mrkt-research", max_instances=1)
+    if settings.keepalive_interval_seconds > 0 and settings.public_base_url:
+        scheduler.add_job(keepalive_job, "interval", seconds=settings.keepalive_interval_seconds, id="render-keepalive", max_instances=1)
     scheduler.start()
 
 

@@ -5,6 +5,7 @@ services:
     plan: starter
     buildCommand: npm install && npm run build && pip install -r backend/requirements.txt
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend
+    healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
         value: sqlite:////var/data/app.sqlite3
@@ -22,6 +23,8 @@ services:
         value: Black,White,Platinum,Silver,Electric Purple,Cyberpunk,Electric Indigo,Neon Blue,Azure Blue,Sapphire,Sky Blue,Mint Green,Emerald,Malachite,Aquamarine,Pacific Green,Lavender,Purple,Violet,Gold,Pure Gold,Satin Gold,Ruby,Crimson,Fuchsia,Magenta
       - key: RESEARCH_INTERVAL_SECONDS
         value: 180
+      - key: KEEPALIVE_INTERVAL_SECONDS
+        value: 240
       - key: PUBLIC_BASE_URL
         value: https://fsfwfwbha.onrender.com
       - key: CRON_SECRET
@@ -35,6 +38,10 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_ALERT_CHAT_ID
+        sync: false
+      - key: TELEGRAM_ALLOWED_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_ALLOWED_USER_IDS
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
         sync: false
