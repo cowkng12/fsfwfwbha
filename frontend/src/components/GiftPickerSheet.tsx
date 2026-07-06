@@ -12,6 +12,7 @@ type Props = {
 };
 
 type SingleKey = 'nfts' | 'models' | 'backdrops' | 'symbols';
+const emptyTraits: GiftTraitCatalog = { models: [], backdrops: [], symbols: [] };
 
 export function GiftPickerSheet({ catalog, filters, symbols, onClose, onApply }: Props) {
   const [draft, setDraft] = useState<FilterState>(filters);
@@ -41,12 +42,13 @@ export function GiftPickerSheet({ catalog, filters, symbols, onClose, onApply }:
     };
   }, [selectedGift]);
 
-  const modelOptions = useMemo(() => sortByRarity(traits?.models ?? catalog.models), [catalog.models, traits]);
-  const backdropOptions = useMemo(() => sortByRarity(traits?.backdrops ?? catalog.backdrops), [catalog.backdrops, traits]);
+  const selectedTraits = selectedGift ? traits ?? emptyTraits : emptyTraits;
+  const modelOptions = useMemo(() => sortByRarity(selectedTraits.models), [selectedTraits.models]);
+  const backdropOptions = useMemo(() => sortByRarity(selectedTraits.backdrops), [selectedTraits.backdrops]);
   const symbolOptions = useMemo(() => {
-    if (traits?.symbols.length) return sortByRarity(traits.symbols);
-    return symbols.map((name) => ({ name, rarity: 0 }));
-  }, [symbols, traits]);
+    if (selectedTraits.symbols.length) return sortByRarity(selectedTraits.symbols);
+    return selectedGift ? [] : symbols.map((name) => ({ name, rarity: 0 }));
+  }, [selectedGift, selectedTraits.symbols, symbols]);
 
   const setSingle = (key: SingleKey, value: string) => {
     setDraft((current) => {
@@ -83,22 +85,22 @@ export function GiftPickerSheet({ catalog, filters, symbols, onClose, onApply }:
         <h3>Дополнительные параметры</h3>
 
         <Field label="Модель">
-          <select value={draft.models[0] ?? ''} onChange={(event) => setSingle('models', event.target.value)}>
-            <option value="">{traitsLoading ? 'Загружаю модели...' : 'Выберите модель'}</option>
+          <select value={draft.models[0] ?? ''} onChange={(event) => setSingle('models', event.target.value)} disabled={!selectedGift || traitsLoading || !modelOptions.length}>
+            <option value="">{optionLabel(selectedGift, traitsLoading, modelOptions.length, 'модель')}</option>
             {modelOptions.map((item) => <option key={item.name} value={item.name}>{traitLabel(item)}</option>)}
           </select>
         </Field>
 
         <Field label="Символ">
-          <select value={draft.symbols[0] ?? ''} onChange={(event) => setSingle('symbols', event.target.value)}>
-            <option value="">{traitsLoading ? 'Загружаю символы...' : 'Выберите символ'}</option>
+          <select value={draft.symbols[0] ?? ''} onChange={(event) => setSingle('symbols', event.target.value)} disabled={!selectedGift || traitsLoading || !symbolOptions.length}>
+            <option value="">{optionLabel(selectedGift, traitsLoading, symbolOptions.length, 'символ')}</option>
             {symbolOptions.map((item) => <option key={item.name} value={item.name}>{traitLabel(item)}</option>)}
           </select>
         </Field>
 
         <Field label="Фон">
-          <select value={draft.backdrops[0] ?? ''} onChange={(event) => setSingle('backdrops', event.target.value)}>
-            <option value="">{traitsLoading ? 'Загружаю фоны...' : 'Выберите фон'}</option>
+          <select value={draft.backdrops[0] ?? ''} onChange={(event) => setSingle('backdrops', event.target.value)} disabled={!selectedGift || traitsLoading || !backdropOptions.length}>
+            <option value="">{optionLabel(selectedGift, traitsLoading, backdropOptions.length, 'фон')}</option>
             {backdropOptions.map((item) => <option key={item.name} value={item.name}>{traitLabel(item)}</option>)}
           </select>
         </Field>
@@ -133,6 +135,13 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function traitLabel(item: ModelCatalogItem | BackdropCatalogItem | SymbolCatalogItem) {
   return item.rarity ? `${item.name} (${item.rarity}%)` : item.name;
+}
+
+function optionLabel(selectedGift: string, loading: boolean, count: number, label: string) {
+  if (!selectedGift) return 'Сначала выберите подарок';
+  if (loading) return `Загружаю ${label}...`;
+  if (!count) return `Нет ${label === 'модель' ? 'моделей' : label === 'фон' ? 'фонов' : 'символов'} для подарка`;
+  return `Выберите ${label}`;
 }
 
 function sortByRarity<T extends { name: string; rarity: number }>(items: T[]) {
