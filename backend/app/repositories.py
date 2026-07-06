@@ -28,8 +28,9 @@ class ListingRepository:
                 INSERT INTO listings (
                     source, external_id, collection_name, name, number, model_name,
                     backdrop_name, symbol_name, image_url, price, floor_price,
-                    model_floor_price, marketplace_url, telegram_url, first_seen_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_floor_price, sales_count, marketplace_url, telegram_url,
+                    first_seen_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -41,6 +42,7 @@ class ListingRepository:
                     price=excluded.price,
                     floor_price=excluded.floor_price,
                     model_floor_price=excluded.model_floor_price,
+                    sales_count=excluded.sales_count,
                     marketplace_url=excluded.marketplace_url,
                     telegram_url=excluded.telegram_url,
                     first_seen_at=COALESCE(listings.first_seen_at, excluded.first_seen_at),
@@ -52,7 +54,7 @@ class ListingRepository:
                         row.get("number"), row.get("model_name"), row.get("backdrop_name"),
                         row.get("symbol_name"), row.get("image_url"), row["price"],
                         row.get("floor_price"), row.get("model_floor_price"),
-                        row.get("marketplace_url"), row.get("telegram_url"),
+                        row.get("sales_count"), row.get("marketplace_url"), row.get("telegram_url"),
                         row.get("first_seen_at"), row["updated_at"],
                     )
                     for row in rows
@@ -86,7 +88,12 @@ class ListingRepository:
             rows = conn.execute(sql, params).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
 
-    def find_unnotified(self, limit: int = 5) -> list[Listing]:
+    def find_unnotified(self, limit: int = 5, first_seen_after: str | None = None) -> list[Listing]:
+        params: list[str | int] = []
+        first_seen_filter = ""
+        if first_seen_after:
+            first_seen_filter = "AND first_seen_at >= ?"
+            params.append(first_seen_after)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -94,15 +101,21 @@ class ListingRepository:
                 WHERE notified_at IS NULL
                   AND image_url IS NOT NULL
                   AND price > 0
+                  {first_seen_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM notified_items
                     WHERE notified_items.source = listings.source
                       AND notified_items.external_id = listings.external_id
                   )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM hidden_items
+                    WHERE hidden_items.source = listings.source
+                      AND hidden_items.external_id = listings.external_id
+                  )
                 ORDER BY first_seen_at DESC, updated_at DESC
                 LIMIT ?
-                """,
-                (limit,),
+                """.format(first_seen_filter=first_seen_filter),
+                (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
 
@@ -116,6 +129,20 @@ class ListingRepository:
                 "UPDATE listings SET notified_at = ? WHERE source = ? AND external_id = ?",
                 (utc_now(), source, external_id),
             )
+
+    def mark_alert_baseline(self) -> int:
+        now = utc_now()
+        with connect() as conn:
+            row = conn.execute("SELECT COUNT(*) AS count FROM listings WHERE notified_at IS NULL").fetchone()
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO notified_items (source, external_id, created_at)
+                SELECT source, external_id, ? FROM listings
+                """,
+                (now,),
+            )
+            conn.execute("UPDATE listings SET notified_at = COALESCE(notified_at, ?)", (now,))
+        return int(row["count"] if row else 0)
 
     def clear_feed(self, archive_current: bool = True) -> int:
         with connect() as conn:

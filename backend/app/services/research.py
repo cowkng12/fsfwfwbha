@@ -58,6 +58,7 @@ class ResearchService:
             "price": price or 0,
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
+            "sales_count": self._int_value(self._deep_pick(gift, "salesCount", "sales_count")),
             "marketplace_url": self._marketplace_url(gift),
             "telegram_url": self._telegram_url(collection, number),
             "first_seen_at": now,
@@ -113,6 +114,14 @@ class ResearchService:
         if "nano" in joined or price > 1_000_000:
             return round(price / 1_000_000_000, 4)
         return price
+
+    def _int_value(self, value: Any) -> int | None:
+        if value in (None, ""):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def _marketplace_url(self, data: dict[str, Any]) -> str | None:
         url = self._deep_pick(data, "url", "link")

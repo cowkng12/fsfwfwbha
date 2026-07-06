@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.database import init_db
-from app.repositories import ListingRepository, ResearchRunRepository
+from app.repositories import ListingRepository, ResearchRunRepository, utc_now
 from app.routes import router
 from app.services.mrkt_client import MrktClient
 from app.services.research import ResearchService
@@ -19,11 +19,19 @@ settings = get_settings()
 research = ResearchService(MrktClient(settings), ListingRepository(), ResearchRunRepository())
 telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
+alerts_ready = False
 
 
 async def research_job() -> None:
+    global alerts_ready
+    started_at = utc_now()
     await research.run()
-    await telegram_bot.send_new_listing_alerts(ListingRepository())
+    repo = ListingRepository()
+    if not alerts_ready:
+        repo.mark_alert_baseline()
+        alerts_ready = True
+        return
+    await telegram_bot.send_new_listing_alerts(repo, first_seen_after=started_at)
 
 app = FastAPI(title="Telegram NFT Research API")
 app.add_middleware(

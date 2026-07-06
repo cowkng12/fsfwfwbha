@@ -63,10 +63,10 @@ class TelegramBotService:
         }
         await self._post("sendMessage", payload)
 
-    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5) -> None:
+    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5, first_seen_after: str | None = None) -> None:
         if not self.settings.telegram_alert_chat_id:
             return
-        for listing in repo.find_unnotified(limit):
+        for listing in repo.find_unnotified(limit, first_seen_after=first_seen_after):
             try:
                 await self.send_listing_alert(listing)
                 repo.mark_notified(listing.source, listing.external_id)
@@ -89,8 +89,6 @@ class TelegramBotService:
         title = f"{listing.collection_name} #{listing.number}" if listing.number else listing.collection_name
         preview_url = listing.telegram_url or listing.marketplace_url
         title_html = f'<a href="{escape(preview_url)}">{escape(title)}</a>' if preview_url else escape(title)
-        owners = self._sample_owners()
-        sales = self._sample_model_sales(listing)
         gift_floor = self._format_ton(listing.floor_price)
         model_floor = self._format_ton(listing.model_floor_price)
         return "\n".join([
@@ -100,13 +98,13 @@ class TelegramBotService:
             f"Модель: <b>{escape(listing.model_name or 'не указана')}</b>",
             f"Фон: <b>{escape(listing.backdrop_name or 'не указан')}</b>",
             "",
-            "<b>Последние владельцы:</b>",
-            "<blockquote>" + "\n".join(escape(owner) for owner in owners) + "</blockquote>",
+            "<b>История владельцев:</b>",
+            "<blockquote>Нет данных от MRKT</blockquote>",
             f"Флор гифта: <b>{gift_floor} TON</b>",
             f"Флор модели: <b>{model_floor} TON</b>",
             "",
-            "<b>Последние продажи модели:</b>",
-            "<blockquote>" + "\n".join(escape(sale) for sale in sales) + "</blockquote>",
+            "<b>Активность модели:</b>",
+            "<blockquote>" + escape(self._format_model_activity(listing)) + "</blockquote>",
             self._format_link(preview_url),
         ])
 
@@ -120,25 +118,11 @@ class TelegramBotService:
             return "-"
         return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    def _sample_owners(self) -> list[str]:
-        return [
-            "@mrktbank - сегодня",
-            "@giftrelayer - сегодня",
-            "@mrktbank - 2 дня назад",
-            "@giftwhale - 5 дней назад",
-            "@toncollector - 8 дней назад",
-        ]
-
-    def _sample_model_sales(self, listing: Listing) -> list[str]:
-        base = listing.price or 0
-        number = listing.number or "-"
-        return [
-            f"#{number} за {self._format_ton(base)} TON на MRKT - сегодня",
-            f"#{int(number) + 1423 if str(number).isdigit() else '-'} за {self._format_ton(base * 1.05 if base else None)} TON на MRKT - 1 день назад",
-            f"#{int(number) + 2298 if str(number).isdigit() else '-'} за {self._format_ton(base * 0.98 if base else None)} TON на MRKT - 2 дня назад",
-            f"#{int(number) + 3151 if str(number).isdigit() else '-'} за {self._format_ton(base * 1.12 if base else None)} TON на MRKT - 4 дня назад",
-            f"#{int(number) + 4084 if str(number).isdigit() else '-'} за {self._format_ton(base * 1.18 if base else None)} TON на MRKT - 7 дней назад",
-        ]
+    def _format_model_activity(self, listing: Listing) -> str:
+        parts = ["Последние продажи модели недоступны"]
+        if listing.sales_count is not None:
+            parts.append(f"Продаж по данным MRKT: {listing.sales_count}")
+        return "\n".join(parts)
 
     async def _post(self, method: str, payload: dict) -> dict:
         if not self.settings.telegram_bot_token:

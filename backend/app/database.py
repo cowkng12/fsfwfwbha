@@ -44,6 +44,7 @@ def init_db() -> None:
                 price REAL NOT NULL,
                 floor_price REAL,
                 model_floor_price REAL,
+                sales_count INTEGER,
                 marketplace_url TEXT,
                 telegram_url TEXT,
                 first_seen_at TEXT,
@@ -81,6 +82,7 @@ def init_db() -> None:
         for statement in [
             "ALTER TABLE listings ADD COLUMN floor_price REAL",
             "ALTER TABLE listings ADD COLUMN model_floor_price REAL",
+            "ALTER TABLE listings ADD COLUMN sales_count INTEGER",
             "ALTER TABLE listings ADD COLUMN telegram_url TEXT",
             "ALTER TABLE listings ADD COLUMN first_seen_at TEXT",
             "ALTER TABLE listings ADD COLUMN notified_at TEXT",
