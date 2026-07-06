@@ -99,7 +99,6 @@ class TelegramBotService:
             "✔ <b>ЛИСТИНГ</b>",
             f"{title_html} на <b>MRKT</b> за",
             f"<b>{self._format_ton(listing.price)} TON</b>",
-            f"Модель: <b>{escape(listing.model_name or 'не указана')}</b>",
             f"Фон: <b>{escape(listing.backdrop_name or 'не указан')}</b>",
             "",
             "<b>Владельцы:</b>",
@@ -142,6 +141,9 @@ class TelegramBotService:
             parts.append(f"Первая продажа: {self._format_date(listing.initial_sale_at)} за {initial_price}{stars}")
         if listing.sales_count is not None:
             parts.append(f"Продаж по данным MRKT: {listing.sales_count}")
+        uses = self._format_uses(listing.uses_count, listing.uses_total)
+        if uses:
+            parts.append(f"Юзы: {uses}")
         if listing.received_at:
             parts.append(f"Получен: {self._format_date(listing.received_at)}")
         if listing.next_resale_at:
@@ -151,6 +153,18 @@ class TelegramBotService:
         if not parts:
             parts.append("Нет данных активности")
         return "\n".join(parts)
+
+    def _format_uses(self, count: int | None, total: int | None) -> str | None:
+        if count is None and total is None:
+            return None
+        if count is not None and total is not None:
+            return f"{self._format_int(count)} / {self._format_int(total)}"
+        if count is not None:
+            return self._format_int(count)
+        return f"всего {self._format_int(total)}"
+
+    def _format_int(self, value: int | None) -> str:
+        return f"{value:,}".replace(",", " ") if value is not None else "-"
 
     def _format_money(self, value: float | None, currency: str | None) -> str:
         if value is None:

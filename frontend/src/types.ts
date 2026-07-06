@@ -21,6 +21,8 @@ export type Listing = {
   floor_price?: number | null;
   model_floor_price?: number | null;
   sales_count?: number | null;
+  uses_count?: number | null;
+  uses_total?: number | null;
   current_owner?: string | null;
   original_sender?: string | null;
   original_recipient?: string | null;

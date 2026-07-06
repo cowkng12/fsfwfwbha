@@ -22,6 +22,8 @@ class Listing(BaseModel):
     floor_price: float | None = None
     model_floor_price: float | None = None
     sales_count: int | None = None
+    uses_count: int | None = None
+    uses_total: int | None = None
     current_owner: str | None = None
     original_sender: str | None = None
     original_recipient: str | None = None

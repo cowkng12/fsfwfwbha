@@ -101,6 +101,20 @@ class ResearchService:
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
             "sales_count": self._int_value(self._deep_pick(gift, "salesCount", "sales_count")),
+            "uses_count": self._int_value(
+                self._deep_pick(
+                    gift,
+                    "usesCount",
+                    "uses_count",
+                    "usedCount",
+                    "used_count",
+                    "availabilityIssued",
+                    "availability_issued",
+                )
+            ),
+            "uses_total": self._int_value(
+                self._deep_pick(gift, "usesTotal", "uses_total", "availabilityTotal", "availability_total")
+            ),
             "current_owner": None,
             "original_sender": None,
             "original_recipient": None,
@@ -181,6 +195,12 @@ class ResearchService:
 
         gift = getattr(unique, "gift", None)
         if gift:
+            uses_count = self._int_value(getattr(gift, "availability_issued", None))
+            uses_total = self._int_value(getattr(gift, "availability_total", None))
+            if uses_count is not None:
+                listing["uses_count"] = uses_count
+            if uses_total is not None:
+                listing["uses_total"] = uses_total
             owner = self._peer_display(getattr(gift, "owner_id", None), unique.users, unique.chats) or getattr(gift, "owner_name", None)
             if owner:
                 listing["current_owner"] = owner
