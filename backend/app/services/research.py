@@ -1,12 +1,44 @@
 import asyncio
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from hashlib import sha1
 from typing import Any
+
+import httpx
 
 from app.catalog import default_collection_names
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
+
+
+class GiftTableParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rows: dict[str, str] = {}
+        self._row: list[str] = []
+        self._capture: str | None = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "tr":
+            self._row = []
+        if tag in {"th", "td"}:
+            self._capture = tag
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._capture:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"th", "td"} and self._capture == tag:
+            value = " ".join("".join(self._text).split())
+            self._row.append(value)
+            self._capture = None
+            self._text = []
+        if tag == "tr" and len(self._row) >= 2:
+            self.rows[self._row[0].lower()] = self._row[1]
 
 
 class ResearchService:
@@ -29,6 +61,7 @@ class ResearchService:
                     for gift in gifts:
                         listing = await self._normalize_gift(gift, name)
                         if self._is_quality_listing(listing):
+                            await self._enrich_public_metadata(listing)
                             normalized.append(listing)
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
@@ -59,6 +92,11 @@ class ResearchService:
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
             "sales_count": self._int_value(self._deep_pick(gift, "salesCount", "sales_count")),
+            "current_owner": None,
+            "received_at": self._deep_pick(gift, "receivedDate", "received_at"),
+            "export_at": self._deep_pick(gift, "exportDate", "export_at"),
+            "next_resale_at": self._deep_pick(gift, "nextResaleDate", "next_resale_at"),
+            "next_transfer_at": self._deep_pick(gift, "nextTransferDate", "next_transfer_at"),
             "marketplace_url": self._marketplace_url(gift),
             "telegram_url": self._telegram_url(collection, number),
             "first_seen_at": now,
@@ -79,6 +117,22 @@ class ResearchService:
         has_premium_backdrop = backdrop in premium_backdrops
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
         return has_premium_backdrop or has_expensive_model
+
+    async def _enrich_public_metadata(self, listing: dict) -> None:
+        url = listing.get("telegram_url")
+        if not url:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                response = await client.get(url, headers={"user-agent": "Mozilla/5.0"})
+                response.raise_for_status()
+        except Exception:
+            return
+        parser = GiftTableParser()
+        parser.feed(response.text)
+        owner = parser.rows.get("owner")
+        if owner:
+            listing["current_owner"] = owner
 
     async def _collection_floor(self, collection: str) -> float | None:
         if collection in self._collection_floor_cache:

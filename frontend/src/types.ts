@@ -21,6 +21,11 @@ export type Listing = {
   floor_price?: number | null;
   model_floor_price?: number | null;
   sales_count?: number | null;
+  current_owner?: string | null;
+  received_at?: string | null;
+  export_at?: string | null;
+  next_resale_at?: string | null;
+  next_transfer_at?: string | null;
   deal_score: number;
   marketplace_url?: string | null;
   telegram_url?: string | null;

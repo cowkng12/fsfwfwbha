@@ -28,9 +28,10 @@ class ListingRepository:
                 INSERT INTO listings (
                     source, external_id, collection_name, name, number, model_name,
                     backdrop_name, symbol_name, image_url, price, floor_price,
-                    model_floor_price, sales_count, marketplace_url, telegram_url,
+                    model_floor_price, sales_count, current_owner, received_at, export_at,
+                    next_resale_at, next_transfer_at, marketplace_url, telegram_url,
                     first_seen_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -43,6 +44,11 @@ class ListingRepository:
                     floor_price=excluded.floor_price,
                     model_floor_price=excluded.model_floor_price,
                     sales_count=excluded.sales_count,
+                    current_owner=excluded.current_owner,
+                    received_at=excluded.received_at,
+                    export_at=excluded.export_at,
+                    next_resale_at=excluded.next_resale_at,
+                    next_transfer_at=excluded.next_transfer_at,
                     marketplace_url=excluded.marketplace_url,
                     telegram_url=excluded.telegram_url,
                     first_seen_at=COALESCE(listings.first_seen_at, excluded.first_seen_at),
@@ -54,7 +60,10 @@ class ListingRepository:
                         row.get("number"), row.get("model_name"), row.get("backdrop_name"),
                         row.get("symbol_name"), row.get("image_url"), row["price"],
                         row.get("floor_price"), row.get("model_floor_price"),
-                        row.get("sales_count"), row.get("marketplace_url"), row.get("telegram_url"),
+                        row.get("sales_count"), row.get("current_owner"),
+                        row.get("received_at"), row.get("export_at"),
+                        row.get("next_resale_at"), row.get("next_transfer_at"),
+                        row.get("marketplace_url"), row.get("telegram_url"),
                         row.get("first_seen_at"), row["updated_at"],
                     )
                     for row in rows

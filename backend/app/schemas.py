@@ -22,6 +22,11 @@ class Listing(BaseModel):
     floor_price: float | None = None
     model_floor_price: float | None = None
     sales_count: int | None = None
+    current_owner: str | None = None
+    received_at: str | None = None
+    export_at: str | None = None
+    next_resale_at: str | None = None
+    next_transfer_at: str | None = None
     deal_score: float = 0
     marketplace_url: str | None = None
     telegram_url: str | None = None

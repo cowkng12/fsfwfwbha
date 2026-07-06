@@ -1,5 +1,6 @@
 import httpx
 import logging
+from datetime import datetime, timezone
 from html import escape
 
 from app.config import Settings
@@ -101,13 +102,13 @@ class TelegramBotService:
             f"Модель: <b>{escape(listing.model_name or 'не указана')}</b>",
             f"Фон: <b>{escape(listing.backdrop_name or 'не указан')}</b>",
             "",
-            "<b>История владельцев:</b>",
-            "<blockquote>Нет данных от MRKT</blockquote>",
+            "<b>Владельцы:</b>",
+            "<blockquote>" + escape(self._format_owners(listing)) + "</blockquote>",
             f"Флор гифта: <b>{gift_floor} TON</b>",
             f"Флор модели: <b>{model_floor} TON</b>",
             "",
-            "<b>Активность модели:</b>",
-            "<blockquote>" + escape(self._format_model_activity(listing)) + "</blockquote>",
+            "<b>Активность:</b>",
+            "<blockquote>" + escape(self._format_activity(listing)) + "</blockquote>",
             self._format_link(preview_url),
         ])
 
@@ -121,11 +122,40 @@ class TelegramBotService:
             return "-"
         return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    def _format_model_activity(self, listing: Listing) -> str:
-        parts = ["Последние продажи модели недоступны"]
+    def _format_owners(self, listing: Listing) -> str:
+        if listing.current_owner:
+            return f"Текущий владелец: {listing.current_owner}"
+        return "Текущий владелец не найден на Telegram NFT странице"
+
+    def _format_activity(self, listing: Listing) -> str:
+        parts: list[str] = []
         if listing.sales_count is not None:
             parts.append(f"Продаж по данным MRKT: {listing.sales_count}")
+        if listing.received_at:
+            parts.append(f"Получен: {self._format_date(listing.received_at)}")
+        if listing.next_resale_at:
+            parts.append(f"Перепродажа: {self._format_availability(listing.next_resale_at)}")
+        if listing.next_transfer_at:
+            parts.append(f"Передача: {self._format_availability(listing.next_transfer_at)}")
+        if not parts:
+            parts.append("Нет данных активности")
         return "\n".join(parts)
+
+    def _format_date(self, value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+        return parsed.strftime("%d.%m.%Y %H:%M UTC")
+
+    def _format_availability(self, value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+        if parsed <= datetime.now(timezone.utc):
+            return "доступна"
+        return self._format_date(value)
 
     async def _post(self, method: str, payload: dict) -> dict:
         if not self.settings.telegram_bot_token:
