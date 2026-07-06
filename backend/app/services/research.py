@@ -5,6 +5,9 @@ from hashlib import sha1
 from typing import Any
 
 import httpx
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+from telethon.tl import functions, types
 
 from app.catalog import default_collection_names
 from app.database import init_db
@@ -55,16 +58,22 @@ class ResearchService:
             init_db()
             collections = collection_names or default_collection_names()
             normalized: list[dict] = []
-            for name in collections:
-                try:
-                    gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
-                    for gift in gifts:
-                        listing = await self._normalize_gift(gift, name)
-                        if self._is_quality_listing(listing):
-                            await self._enrich_public_metadata(listing)
-                            normalized.append(listing)
-                except Exception as exc:
-                    self.runs.add("mrkt", "error", f"{name}: {exc}")
+            telegram_client = await self._telegram_client()
+            try:
+                for name in collections:
+                    try:
+                        gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
+                        for gift in gifts:
+                            listing = await self._normalize_gift(gift, name)
+                            if self._is_quality_listing(listing):
+                                await self._enrich_public_metadata(listing)
+                                await self._enrich_unique_gift_metadata(listing, telegram_client)
+                                normalized.append(listing)
+                    except Exception as exc:
+                        self.runs.add("mrkt", "error", f"{name}: {exc}")
+            finally:
+                if telegram_client:
+                    await telegram_client.disconnect()
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count
@@ -93,6 +102,16 @@ class ResearchService:
             "model_floor_price": model_floor_price,
             "sales_count": self._int_value(self._deep_pick(gift, "salesCount", "sales_count")),
             "current_owner": None,
+            "original_sender": None,
+            "original_recipient": None,
+            "original_gift_at": None,
+            "last_sale_at": None,
+            "last_sale_price": None,
+            "last_sale_currency": None,
+            "initial_sale_at": None,
+            "initial_sale_price": None,
+            "initial_sale_currency": None,
+            "initial_sale_stars": None,
             "received_at": self._deep_pick(gift, "receivedDate", "received_at"),
             "export_at": self._deep_pick(gift, "exportDate", "export_at"),
             "next_resale_at": self._deep_pick(gift, "nextResaleDate", "next_resale_at"),
@@ -133,6 +152,103 @@ class ResearchService:
         owner = parser.rows.get("owner")
         if owner:
             listing["current_owner"] = owner
+
+    async def _telegram_client(self) -> TelegramClient | None:
+        settings = self.mrkt.settings
+        if not settings.telegram_api_id or not settings.telegram_api_hash or not settings.telegram_session:
+            return None
+        try:
+            client = TelegramClient(StringSession(settings.telegram_session), settings.telegram_api_id, settings.telegram_api_hash)
+            await client.connect()
+            if not await client.is_user_authorized():
+                await client.disconnect()
+                return None
+            return client
+        except Exception:
+            return None
+
+    async def _enrich_unique_gift_metadata(self, listing: dict, client: TelegramClient | None) -> None:
+        if not client:
+            return
+        slug = self._telegram_slug(listing.get("telegram_url"))
+        if not slug:
+            return
+        try:
+            unique = await client(functions.payments.GetUniqueStarGiftRequest(slug=slug))
+            value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
+        except Exception:
+            return
+
+        gift = getattr(unique, "gift", None)
+        if gift:
+            owner = self._peer_display(getattr(gift, "owner_id", None), unique.users, unique.chats) or getattr(gift, "owner_name", None)
+            if owner:
+                listing["current_owner"] = owner
+            for attribute in getattr(gift, "attributes", []) or []:
+                if isinstance(attribute, types.StarGiftAttributeOriginalDetails):
+                    sender = self._peer_display(getattr(attribute, "sender_id", None), unique.users, unique.chats)
+                    recipient = self._peer_display(getattr(attribute, "recipient_id", None), unique.users, unique.chats)
+                    if sender:
+                        listing["original_sender"] = sender
+                    if recipient:
+                        listing["original_recipient"] = recipient
+                    listing["original_gift_at"] = self._iso_datetime(getattr(attribute, "date", None))
+
+        currency = getattr(value_info, "currency", None)
+        listing["last_sale_at"] = self._iso_datetime(getattr(value_info, "last_sale_date", None))
+        listing["last_sale_price"] = self._currency_amount(getattr(value_info, "last_sale_price", None), currency)
+        listing["last_sale_currency"] = currency if listing["last_sale_price"] is not None else None
+        listing["initial_sale_at"] = self._iso_datetime(getattr(value_info, "initial_sale_date", None))
+        listing["initial_sale_price"] = self._currency_amount(getattr(value_info, "initial_sale_price", None), currency)
+        listing["initial_sale_currency"] = currency if listing["initial_sale_price"] is not None else None
+        listing["initial_sale_stars"] = self._int_value(getattr(value_info, "initial_sale_stars", None))
+
+    def _telegram_slug(self, url: str | None) -> str | None:
+        if not url:
+            return None
+        return url.rstrip("/").rsplit("/", 1)[-1] or None
+
+    def _peer_display(self, peer: Any, users: list[Any], chats: list[Any]) -> str | None:
+        if isinstance(peer, types.PeerUser):
+            item = next((user for user in users if getattr(user, "id", None) == peer.user_id), None)
+            return self._user_display(item) if item else str(peer.user_id)
+        if isinstance(peer, (types.PeerChannel, types.PeerChat)):
+            peer_id = getattr(peer, "channel_id", None) or getattr(peer, "chat_id", None)
+            item = next((chat for chat in chats if getattr(chat, "id", None) == peer_id), None)
+            return self._chat_display(item) if item else str(peer_id)
+        return None
+
+    def _user_display(self, user: Any) -> str | None:
+        if not user:
+            return None
+        username = getattr(user, "username", None)
+        if username:
+            return f"@{username}"
+        name = " ".join(part for part in [getattr(user, "first_name", None), getattr(user, "last_name", None)] if part)
+        return name or str(getattr(user, "id", "")) or None
+
+    def _chat_display(self, chat: Any) -> str | None:
+        if not chat:
+            return None
+        username = getattr(chat, "username", None)
+        if username:
+            return f"@{username}"
+        return getattr(chat, "title", None) or str(getattr(chat, "id", "")) or None
+
+    def _iso_datetime(self, value: Any) -> str | None:
+        if isinstance(value, datetime):
+            return value.astimezone(timezone.utc).isoformat()
+        return value if isinstance(value, str) and value else None
+
+    def _currency_amount(self, value: Any, currency: str | None) -> float | None:
+        if value in (None, ""):
+            return None
+        amount = float(value)
+        if currency == "TON":
+            return round(amount / 1_000_000_000, 4)
+        if currency in {"XTR", "STARS"}:
+            return amount
+        return round(amount / 100, 2)
 
     async def _collection_floor(self, collection: str) -> float | None:
         if collection in self._collection_floor_cache:

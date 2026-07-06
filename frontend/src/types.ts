@@ -22,6 +22,16 @@ export type Listing = {
   model_floor_price?: number | null;
   sales_count?: number | null;
   current_owner?: string | null;
+  original_sender?: string | null;
+  original_recipient?: string | null;
+  original_gift_at?: string | null;
+  last_sale_at?: string | null;
+  last_sale_price?: number | null;
+  last_sale_currency?: string | null;
+  initial_sale_at?: string | null;
+  initial_sale_price?: number | null;
+  initial_sale_currency?: string | null;
+  initial_sale_stars?: number | null;
   received_at?: string | null;
   export_at?: string | null;
   next_resale_at?: string | null;

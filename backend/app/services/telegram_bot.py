@@ -123,23 +123,40 @@ class TelegramBotService:
         return f"{value:.2f}".rstrip("0").rstrip(".")
 
     def _format_owners(self, listing: Listing) -> str:
+        parts: list[str] = []
         if listing.current_owner:
-            return f"Текущий владелец: {listing.current_owner}"
-        return "Текущий владелец не найден на Telegram NFT странице"
+            parts.append(f"Текущий владелец: {listing.current_owner}")
+        if listing.original_sender:
+            parts.append(f"Первый отправитель: {listing.original_sender}")
+        if listing.original_recipient:
+            parts.append(f"Первый получатель: {listing.original_recipient}")
+        return "\n".join(parts) if parts else "Владельцы не найдены"
 
     def _format_activity(self, listing: Listing) -> str:
         parts: list[str] = []
+        if listing.last_sale_at and listing.last_sale_price is not None:
+            parts.append(f"Последняя перепродажа: {self._format_date(listing.last_sale_at)} за {self._format_money(listing.last_sale_price, listing.last_sale_currency)}")
+        if listing.initial_sale_at and (listing.initial_sale_price is not None or listing.initial_sale_stars is not None):
+            initial_price = self._format_money(listing.initial_sale_price, listing.initial_sale_currency) if listing.initial_sale_price is not None else "-"
+            stars = f" / {listing.initial_sale_stars} Stars" if listing.initial_sale_stars is not None else ""
+            parts.append(f"Первая продажа: {self._format_date(listing.initial_sale_at)} за {initial_price}{stars}")
         if listing.sales_count is not None:
             parts.append(f"Продаж по данным MRKT: {listing.sales_count}")
         if listing.received_at:
             parts.append(f"Получен: {self._format_date(listing.received_at)}")
         if listing.next_resale_at:
-            parts.append(f"Перепродажа: {self._format_availability(listing.next_resale_at)}")
+            parts.append(f"Доступность перепродажи: {self._format_availability(listing.next_resale_at)}")
         if listing.next_transfer_at:
-            parts.append(f"Передача: {self._format_availability(listing.next_transfer_at)}")
+            parts.append(f"Доступность передачи: {self._format_availability(listing.next_transfer_at)}")
         if not parts:
             parts.append("Нет данных активности")
         return "\n".join(parts)
+
+    def _format_money(self, value: float | None, currency: str | None) -> str:
+        if value is None:
+            return "-"
+        formatted = f"{value:,.2f}".replace(",", " ").rstrip("0").rstrip(".")
+        return f"{formatted} {currency or ''}".strip()
 
     def _format_date(self, value: str) -> str:
         try:

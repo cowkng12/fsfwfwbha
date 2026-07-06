@@ -23,6 +23,16 @@ class Listing(BaseModel):
     model_floor_price: float | None = None
     sales_count: int | None = None
     current_owner: str | None = None
+    original_sender: str | None = None
+    original_recipient: str | None = None
+    original_gift_at: str | None = None
+    last_sale_at: str | None = None
+    last_sale_price: float | None = None
+    last_sale_currency: str | None = None
+    initial_sale_at: str | None = None
+    initial_sale_price: float | None = None
+    initial_sale_currency: str | None = None
+    initial_sale_stars: int | None = None
     received_at: str | None = None
     export_at: str | None = None
     next_resale_at: str | None = None
