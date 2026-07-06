@@ -87,7 +87,8 @@ class TelegramBotService:
 
     def _format_listing_alert(self, listing: Listing) -> str:
         title = f"{listing.collection_name} #{listing.number}" if listing.number else listing.collection_name
-        title_html = f'<a href="{escape(listing.marketplace_url)}">{escape(title)}</a>' if listing.marketplace_url else escape(title)
+        preview_url = listing.telegram_url or listing.marketplace_url
+        title_html = f'<a href="{escape(preview_url)}">{escape(title)}</a>' if preview_url else escape(title)
         owners = self._sample_owners()
         sales = self._sample_model_sales(listing)
         gift_floor = self._format_ton(listing.floor_price)
@@ -106,7 +107,7 @@ class TelegramBotService:
             "",
             "<b>Последние продажи модели:</b>",
             "<blockquote>" + "\n".join(escape(sale) for sale in sales) + "</blockquote>",
-            self._format_link(listing.marketplace_url),
+            self._format_link(preview_url),
         ])
 
     def _format_link(self, url: str | None) -> str:

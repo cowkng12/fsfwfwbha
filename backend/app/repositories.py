@@ -28,8 +28,8 @@ class ListingRepository:
                 INSERT INTO listings (
                     source, external_id, collection_name, name, number, model_name,
                     backdrop_name, symbol_name, image_url, price, floor_price,
-                    model_floor_price, marketplace_url, first_seen_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_floor_price, marketplace_url, telegram_url, first_seen_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -42,6 +42,7 @@ class ListingRepository:
                     floor_price=excluded.floor_price,
                     model_floor_price=excluded.model_floor_price,
                     marketplace_url=excluded.marketplace_url,
+                    telegram_url=excluded.telegram_url,
                     first_seen_at=COALESCE(listings.first_seen_at, excluded.first_seen_at),
                     updated_at=excluded.updated_at
                 """,
@@ -51,7 +52,8 @@ class ListingRepository:
                         row.get("number"), row.get("model_name"), row.get("backdrop_name"),
                         row.get("symbol_name"), row.get("image_url"), row["price"],
                         row.get("floor_price"), row.get("model_floor_price"),
-                        row.get("marketplace_url"), row.get("first_seen_at"), row["updated_at"],
+                        row.get("marketplace_url"), row.get("telegram_url"),
+                        row.get("first_seen_at"), row["updated_at"],
                     )
                     for row in rows
                 ],

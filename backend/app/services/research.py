@@ -59,6 +59,7 @@ class ResearchService:
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
             "marketplace_url": self._marketplace_url(gift),
+            "telegram_url": self._telegram_url(collection, number),
             "first_seen_at": now,
             "updated_at": now,
         }
@@ -119,6 +120,12 @@ class ResearchService:
             return url
         start_app = self._deep_pick(data, "startApp", "startapp", "startAppPayload", "slug", "id")
         return f"https://t.me/mrkt/app?startapp={start_app}" if start_app else None
+
+    def _telegram_url(self, collection: str, number: str | None) -> str | None:
+        if not collection or not number:
+            return None
+        slug = "".join(part for part in collection.title() if part.isalnum())
+        return f"https://t.me/nft/{slug}-{number}"
 
     def _pick(self, data: dict[str, Any], *keys: str) -> Any:
         for key in keys:

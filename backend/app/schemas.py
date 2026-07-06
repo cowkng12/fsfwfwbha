@@ -23,6 +23,7 @@ class Listing(BaseModel):
     model_floor_price: float | None = None
     deal_score: float = 0
     marketplace_url: str | None = None
+    telegram_url: str | None = None
     first_seen_at: str | None = None
     notified_at: str | None = None
     updated_at: str

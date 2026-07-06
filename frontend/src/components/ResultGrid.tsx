@@ -21,7 +21,7 @@ export function ResultGrid({ items, loading }: Props) {
             <p className="trait-line">🎲 {item.model_name || 'Модель не указана'} <mark>{formatPercent(item.model_floor_price, item.price)}</mark></p>
             <p className="trait-line">🖼 {item.backdrop_name || 'Фон не указан'} <mark>{formatPercent(item.floor_price, item.price)}</mark></p>
             <p className="price-line">💎 {formatPrice(item.price)} TON</p>
-            <a className="open-link" href={item.marketplace_url ?? '#'}>MRKT #{item.number ?? item.external_id.slice(0, 6)}</a>
+            <a className="open-link" href={item.telegram_url || item.marketplace_url || '#'}>NFT #{item.number ?? item.external_id.slice(0, 6)}</a>
           </div>
         </article>
       ))}
