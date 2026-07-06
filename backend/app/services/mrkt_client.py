@@ -49,7 +49,16 @@ class MrktClient:
     async def token(self) -> str:
         return self._token or await self._fetch_token_from_telegram()
 
-    async def saling(self, collection_names: list[str], model_names: list[str] | None = None, backdrop_names: list[str] | None = None, count: int = 20, max_price: float | None = None) -> list[dict]:
+    async def saling(
+        self,
+        collection_names: list[str],
+        model_names: list[str] | None = None,
+        backdrop_names: list[str] | None = None,
+        count: int = 20,
+        max_price: float | None = None,
+        use_default_max_price: bool = True,
+    ) -> list[dict]:
+        effective_max_price = max_price if max_price is not None else (self.settings.mrkt_max_price if use_default_max_price else None)
         payload = {
             "collectionNames": collection_names,
             "modelNames": model_names or [],
@@ -57,7 +66,7 @@ class MrktClient:
             "symbolNames": [],
             "ordering": "Price",
             "lowToHigh": True,
-            "maxPrice": self._ton_to_nano(max_price if max_price is not None else self.settings.mrkt_max_price),
+            "maxPrice": self._ton_to_nano(effective_max_price),
             "minPrice": None,
             "mintable": None,
             "number": None,

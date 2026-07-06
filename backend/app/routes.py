@@ -96,12 +96,19 @@ async def debug_mrkt(client=Depends(mrkt_client)):
     }
     try:
         token = await client.token()
-        gifts = await client.saling(["Xmas Stocking"], count=3, max_price=settings.mrkt_max_price)
+        debug_items = []
+        first_gift = None
+        for collection in default_collection_names():
+            gifts = await client.saling([collection], count=3, max_price=settings.mrkt_max_price)
+            debug_items.append({"collection": collection, "gift_count": len(gifts)})
+            if gifts and first_gift is None:
+                first_gift = gifts[0]
         result.update({
             "token_ok": bool(token),
-            "gift_count": len(gifts),
-            "first_gift_keys": list(gifts[0].keys()) if gifts else [],
-            "first_gift": gifts[0] if gifts else None,
+            "gift_count": sum(item["gift_count"] for item in debug_items),
+            "collections": debug_items,
+            "first_gift_keys": list(first_gift.keys()) if first_gift else [],
+            "first_gift": first_gift,
         })
     except Exception as exc:
         result.update({"token_ok": False, "error": str(exc)})

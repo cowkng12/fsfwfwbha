@@ -13,7 +13,7 @@ services:
       - key: MRKT_API_URL
         value: https://api.tgmrkt.io/api/v1
       - key: MRKT_MAX_PRICE
-        value: 100
+        value: 50
       - key: RESEARCH_INTERVAL_SECONDS
         value: 180
       - key: PUBLIC_BASE_URL

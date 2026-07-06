@@ -15,6 +15,8 @@ class ResearchService:
         self.listings = listings
         self.runs = runs
         self._lock = asyncio.Lock()
+        self._collection_floor_cache: dict[str, float | None] = {}
+        self._model_floor_cache: dict[tuple[str, str], float | None] = {}
 
     async def run(self, collection_names: list[str] | None = None) -> int:
         async with self._lock:
@@ -24,26 +26,22 @@ class ResearchService:
             for name in collections:
                 try:
                     gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
-                    normalized.extend(self._normalize_gift(gift, name) for gift in gifts)
+                    for gift in gifts:
+                        normalized.append(await self._normalize_gift(gift, name))
                 except Exception as exc:
                     self.runs.add("mrkt", "error", f"{name}: {exc}")
-            if not any(item.get("image_url") for item in normalized):
-                try:
-                    gifts = await self.mrkt.saling(["Xmas Stocking"], max_price=self.mrkt.settings.mrkt_max_price)
-                    normalized.extend(self._normalize_gift(gift, "Xmas Stocking") for gift in gifts)
-                except Exception as exc:
-                    self.runs.add("mrkt", "error", f"fallback: {exc}")
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count
 
-    def _normalize_gift(self, gift: dict[str, Any], fallback_collection: str) -> dict:
+    async def _normalize_gift(self, gift: dict[str, Any], fallback_collection: str) -> dict:
         collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or fallback_collection
         number = str(self._deep_pick(gift, "number", "giftNumber", "num", "gift_num", "giftNum") or "") or None
         external_id = str(self._pick(gift, "id", "giftId", "slug") or sha1(repr(gift).encode()).hexdigest())
         price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
-        floor_price = self._price(gift, "floorPriceNanoTONsByCollection", "collectionFloor", "floorPrice")
-        model_floor_price = self._price(gift, "floorPriceNanoTONsByBackdropModel", "modelFloor", "backdropModelFloor")
+        model_name = self._deep_pick(gift, "modelName", "model")
+        floor_price = self._price(gift, "floorPriceNanoTONsByCollection", "collectionFloor", "floorPrice") or await self._collection_floor(collection)
+        model_floor_price = self._price(gift, "floorPriceNanoTONsByBackdropModel", "modelFloor", "backdropModelFloor") or await self._model_floor(collection, model_name)
         now = datetime.now(timezone.utc).isoformat()
         return {
             "source": "mrkt",
@@ -51,7 +49,7 @@ class ResearchService:
             "collection_name": collection,
             "name": f"{collection} #{number}" if number else collection,
             "number": number,
-            "model_name": self._deep_pick(gift, "modelName", "model"),
+            "model_name": model_name,
             "backdrop_name": self._deep_pick(gift, "backdropName", "backdrop", "backgroundName"),
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
             "image_url": self._image_url(gift),
@@ -62,6 +60,31 @@ class ResearchService:
             "first_seen_at": now,
             "updated_at": now,
         }
+
+    async def _collection_floor(self, collection: str) -> float | None:
+        if collection in self._collection_floor_cache:
+            return self._collection_floor_cache[collection]
+        try:
+            gifts = await self.mrkt.saling([collection], count=1, use_default_max_price=False)
+            value = self._price(gifts[0], "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice") if gifts else None
+        except Exception:
+            value = None
+        self._collection_floor_cache[collection] = value
+        return value
+
+    async def _model_floor(self, collection: str, model: str | None) -> float | None:
+        if not model:
+            return None
+        key = (collection, model)
+        if key in self._model_floor_cache:
+            return self._model_floor_cache[key]
+        try:
+            gifts = await self.mrkt.saling([collection], model_names=[model], count=1, use_default_max_price=False)
+            value = self._price(gifts[0], "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice") if gifts else None
+        except Exception:
+            value = None
+        self._model_floor_cache[key] = value
+        return value
 
     def _price(self, data: dict[str, Any], *keys: str) -> float | None:
         value = self._deep_pick(data, *keys)

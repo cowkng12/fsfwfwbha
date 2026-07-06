@@ -106,9 +106,13 @@ class TelegramBotService:
             "",
             "<b>Последние продажи модели:</b>",
             "<blockquote>" + "\n".join(escape(sale) for sale in sales) + "</blockquote>",
-            "<b>Ссылка</b>",
-            escape(listing.marketplace_url or "MRKT link unavailable"),
+            self._format_link(listing.marketplace_url),
         ])
+
+    def _format_link(self, url: str | None) -> str:
+        if not url:
+            return "<b>Ссылка</b>: нет ссылки MRKT"
+        return f'<a href="{escape(url)}"><b>Ссылка</b></a>'
 
     def _format_ton(self, value: float | None) -> str:
         if value is None:
