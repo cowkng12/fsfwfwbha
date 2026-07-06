@@ -105,21 +105,40 @@ class TelegramBotService:
             "<blockquote>" + escape(self._format_owners(listing)) + "</blockquote>",
             f"Флор гифта: <b>{gift_floor} TON</b>",
             f"Флор модели: <b>{model_floor} TON</b>",
+            self._format_combo_market(listing),
             "",
             "<b>Активность:</b>",
             "<blockquote>" + escape(self._format_activity(listing)) + "</blockquote>",
-            self._format_link(preview_url),
+            self._format_links(listing, preview_url),
         ])
 
-    def _format_link(self, url: str | None) -> str:
-        if not url:
-            return "<b>Ссылка</b>: нет ссылки MRKT"
-        return f'<a href="{escape(url)}"><b>Ссылка</b></a>'
+    def _format_combo_market(self, listing: Listing) -> str:
+        parts: list[str] = []
+        if listing.combo_listed_count is not None:
+            parts.append(f"{self._format_int(listing.combo_listed_count)} на MRKT")
+        if listing.combo_floor_price is not None:
+            parts.append(f"от {self._format_ton(listing.combo_floor_price)} TON")
+        if not parts:
+            return "Сочетание: <b>нет данных MRKT</b>"
+        return f"Сочетание: <b>{' / '.join(parts)}</b>"
+
+    def _format_links(self, listing: Listing, visual_url: str | None) -> str:
+        links: list[str] = []
+        if listing.marketplace_url:
+            links.append(f'<a href="{escape(listing.marketplace_url)}">MRKT</a>')
+        if visual_url:
+            links.append(f'<a href="{escape(visual_url)}">Визуал</a>')
+        if not links:
+            return "<b>Ссылки:</b> нет"
+        return f"<b>Ссылки:</b> {' | '.join(links)}"
 
     def _format_ton(self, value: float | None) -> str:
         if value is None:
             return "-"
         return f"{value:.2f}".rstrip("0").rstrip(".")
+
+    def _format_int(self, value: int | None) -> str:
+        return f"{value:,}".replace(",", " ") if value is not None else "-"
 
     def _format_owners(self, listing: Listing) -> str:
         parts: list[str] = []

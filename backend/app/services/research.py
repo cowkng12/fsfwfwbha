@@ -52,6 +52,7 @@ class ResearchService:
         self._lock = asyncio.Lock()
         self._collection_floor_cache: dict[str, float | None] = {}
         self._model_floor_cache: dict[tuple[str, str], float | None] = {}
+        self._combo_market_cache: dict[tuple[str, str, str], tuple[int | None, float | None]] = {}
 
     async def run(self, collection_names: list[str] | None = None) -> int:
         async with self._lock:
@@ -66,6 +67,7 @@ class ResearchService:
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
+                                await self._enrich_combo_market(listing)
                                 await self._enrich_public_metadata(listing)
                                 await self._enrich_unique_gift_metadata(listing, telegram_client)
                                 normalized.append(listing)
@@ -84,6 +86,7 @@ class ResearchService:
         external_id = str(self._pick(gift, "id", "giftId", "slug") or sha1(repr(gift).encode()).hexdigest())
         price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
         model_name = self._deep_pick(gift, "modelName", "model")
+        backdrop_name = self._deep_pick(gift, "backdropName", "backdrop", "backgroundName")
         floor_price = self._price(gift, "floorPriceNanoTONsByCollection", "collectionFloor", "floorPrice") or await self._collection_floor(collection)
         model_floor_price = self._price(gift, "floorPriceNanoTONsByBackdropModel", "modelFloor", "backdropModelFloor") or await self._model_floor(collection, model_name)
         now = datetime.now(timezone.utc).isoformat()
@@ -94,9 +97,9 @@ class ResearchService:
             "name": f"{collection} #{number}" if number else collection,
             "number": number,
             "model_name": model_name,
-            "backdrop_name": self._deep_pick(gift, "backdropName", "backdrop", "backgroundName"),
+            "backdrop_name": backdrop_name,
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
-            "image_url": self._image_url(gift),
+            "image_url": self._fragment_image_url(collection, number) or self._image_url(gift),
             "price": price or 0,
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
@@ -115,6 +118,8 @@ class ResearchService:
             "uses_total": self._int_value(
                 self._deep_pick(gift, "usesTotal", "uses_total", "availabilityTotal", "availability_total")
             ),
+            "combo_listed_count": None,
+            "combo_floor_price": None,
             "current_owner": None,
             "original_sender": None,
             "original_recipient": None,
@@ -150,6 +155,50 @@ class ResearchService:
         has_premium_backdrop = backdrop in premium_backdrops
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
         return has_premium_backdrop or has_expensive_model
+
+    async def _enrich_combo_market(self, listing: dict) -> None:
+        count, floor = await self._combo_market(
+            listing.get("collection_name"),
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+        )
+        listing["combo_listed_count"] = count
+        listing["combo_floor_price"] = floor
+
+    async def _combo_market(self, collection: str | None, model: str | None, backdrop: str | None) -> tuple[int | None, float | None]:
+        if not collection or not model or not backdrop:
+            return None, None
+        key = (collection, model, backdrop)
+        if key in self._combo_market_cache:
+            return self._combo_market_cache[key]
+        count = 0
+        floor_price: float | None = None
+        cursor = ""
+        seen_cursors: set[str] = set()
+        try:
+            while True:
+                page = await self.mrkt.saling_page(
+                    [collection],
+                    model_names=[model],
+                    backdrop_names=[backdrop],
+                    count=20,
+                    cursor=cursor,
+                    use_default_max_price=False,
+                )
+                gifts = page.get("gifts", []) or []
+                if gifts and floor_price is None:
+                    floor_price = self._price(gifts[0], "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
+                count += len(gifts)
+                cursor = page.get("cursor") or ""
+                if not cursor or cursor in seen_cursors:
+                    break
+                seen_cursors.add(cursor)
+        except Exception:
+            result = (None, None)
+        else:
+            result = (count, floor_price)
+        self._combo_market_cache[key] = result
+        return result
 
     async def _enrich_public_metadata(self, listing: dict) -> None:
         url = listing.get("telegram_url")
@@ -325,6 +374,12 @@ class ResearchService:
             return None
         slug = "".join(part for part in collection.title() if part.isalnum())
         return f"https://t.me/nft/{slug}-{number}"
+
+    def _fragment_image_url(self, collection: str, number: str | None) -> str | None:
+        if not collection or not number:
+            return None
+        slug = "".join(part for part in collection.title() if part.isalnum())
+        return f"https://nft.fragment.com/gift/{slug.lower()}-{number}.webp"
 
     def _pick(self, data: dict[str, Any], *keys: str) -> Any:
         for key in keys:

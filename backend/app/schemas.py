@@ -24,6 +24,8 @@ class Listing(BaseModel):
     sales_count: int | None = None
     uses_count: int | None = None
     uses_total: int | None = None
+    combo_listed_count: int | None = None
+    combo_floor_price: float | None = None
     current_owner: str | None = None
     original_sender: str | None = None
     original_recipient: str | None = None

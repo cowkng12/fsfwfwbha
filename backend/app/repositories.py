@@ -29,13 +29,14 @@ class ListingRepository:
                     source, external_id, collection_name, name, number, model_name,
                     backdrop_name, symbol_name, image_url, price, floor_price,
                     model_floor_price, sales_count, uses_count, uses_total,
-                    current_owner, original_sender, original_recipient,
-                    original_gift_at, last_sale_at, last_sale_price, last_sale_currency,
+                    combo_listed_count, combo_floor_price, current_owner,
+                    original_sender, original_recipient, original_gift_at,
+                    last_sale_at, last_sale_price, last_sale_currency,
                     initial_sale_at, initial_sale_price, initial_sale_currency,
                     initial_sale_stars, received_at, export_at, next_resale_at,
                     next_transfer_at, marketplace_url, telegram_url, first_seen_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -50,6 +51,8 @@ class ListingRepository:
                     sales_count=excluded.sales_count,
                     uses_count=excluded.uses_count,
                     uses_total=excluded.uses_total,
+                    combo_listed_count=excluded.combo_listed_count,
+                    combo_floor_price=excluded.combo_floor_price,
                     current_owner=excluded.current_owner,
                     original_sender=excluded.original_sender,
                     original_recipient=excluded.original_recipient,
@@ -77,7 +80,8 @@ class ListingRepository:
                         row.get("symbol_name"), row.get("image_url"), row["price"],
                         row.get("floor_price"), row.get("model_floor_price"),
                         row.get("sales_count"), row.get("uses_count"),
-                        row.get("uses_total"), row.get("current_owner"),
+                        row.get("uses_total"), row.get("combo_listed_count"),
+                        row.get("combo_floor_price"), row.get("current_owner"),
                         row.get("original_sender"), row.get("original_recipient"),
                         row.get("original_gift_at"), row.get("last_sale_at"),
                         row.get("last_sale_price"), row.get("last_sale_currency"),

@@ -55,9 +55,31 @@ class MrktClient:
         model_names: list[str] | None = None,
         backdrop_names: list[str] | None = None,
         count: int = 20,
+        cursor: str = "",
         max_price: float | None = None,
         use_default_max_price: bool = True,
     ) -> list[dict]:
+        payload = await self.saling_page(
+            collection_names,
+            model_names=model_names,
+            backdrop_names=backdrop_names,
+            count=count,
+            cursor=cursor,
+            max_price=max_price,
+            use_default_max_price=use_default_max_price,
+        )
+        return payload.get("gifts", [])
+
+    async def saling_page(
+        self,
+        collection_names: list[str],
+        model_names: list[str] | None = None,
+        backdrop_names: list[str] | None = None,
+        count: int = 20,
+        cursor: str = "",
+        max_price: float | None = None,
+        use_default_max_price: bool = True,
+    ) -> dict:
         effective_max_price = max_price if max_price is not None else (self.settings.mrkt_max_price if use_default_max_price else None)
         payload = {
             "collectionNames": collection_names,
@@ -71,7 +93,7 @@ class MrktClient:
             "mintable": None,
             "number": None,
             "count": min(count, 20),
-            "cursor": "",
+            "cursor": cursor,
             "query": None,
             "promotedFirst": False,
         }
@@ -89,7 +111,7 @@ class MrktClient:
                 payload = response.json()
             except Exception:
                 raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
-        return payload.get("gifts", [])
+        return payload
 
     def _ton_to_nano(self, value: float | None) -> int | None:
         if value is None:
