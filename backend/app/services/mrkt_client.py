@@ -15,6 +15,7 @@ class MrktClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._token = settings.mrkt_auth_token
+        self._cookie = f"access_token={settings.mrkt_auth_token}" if settings.mrkt_auth_token else None
 
     async def _fetch_token_from_telegram(self) -> str:
         if not self.settings.telegram_api_id or not self.settings.telegram_api_hash or not self.settings.telegram_session:
@@ -42,6 +43,7 @@ class MrktClient:
         if not token:
             raise RuntimeError("MRKT auth did not return token")
         self._token = token
+        self._cookie = f"access_token={token}"
         return token
 
     async def token(self) -> str:
@@ -55,7 +57,7 @@ class MrktClient:
             "symbolNames": [],
             "ordering": "Price",
             "lowToHigh": True,
-            "maxPrice": max_price if max_price is not None else self.settings.mrkt_max_price,
+            "maxPrice": self._ton_to_nano(max_price if max_price is not None else self.settings.mrkt_max_price),
             "minPrice": None,
             "mintable": None,
             "number": None,
@@ -80,8 +82,13 @@ class MrktClient:
                 raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
         return payload.get("gifts", [])
 
+    def _ton_to_nano(self, value: float | None) -> int | None:
+        if value is None:
+            return None
+        return int(float(value) * 1_000_000_000)
+
     def _headers(self, token: str) -> dict[str, str]:
-        return {
+        headers = {
             "accept": "application/json, text/plain, */*",
             "authorization": token,
             "origin": "https://cdn.tgmrkt.io",
@@ -89,3 +96,6 @@ class MrktClient:
             "content-type": "application/json",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36",
         }
+        if self._cookie:
+            headers["cookie"] = self._cookie
+        return headers
