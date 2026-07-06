@@ -23,10 +23,12 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 
 1. Подключите GitHub репозиторий к Render.
 2. Создайте Blueprint из `render.yaml`.
-3. В Render Dashboard заполните secret env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`.
+3. В Render Dashboard заполните secret env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`, `CRON_SECRET`.
 4. После первого деплоя укажите домен сервиса в `CORS_ORIGINS`, если Render выдаст другое имя.
 
 Для ответа бота на `/start` задайте `PUBLIC_BASE_URL` равным публичному URL Render-сервиса. Backend сам установит Telegram webhook при старте.
+
+Если Render-сервис засыпает, добавьте внешний cron/uptime check каждые 3-5 минут. Самый легкий вариант для поддержания процесса живым: `GET https://fsfwfwbha.onrender.com/api/health`. Вариант, который сразу запускает скан и алерты: `GET https://fsfwfwbha.onrender.com/api/cron/research?secret=<CRON_SECRET>`.
 
 ## API
 
@@ -34,6 +36,7 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 - `GET /api/catalog` - все справочники фильтров.
 - `GET /api/results` - лучшие варианты с фильтрами `collectionNames`, `backdropNames`, `modelNames`.
 - `POST /api/research/run` - ручной запуск ресерча.
+- `GET|POST /api/cron/research?secret=<CRON_SECRET>` - защищенный запуск ресерча и Telegram-алертов для внешнего cron.
 
 ## Масштабирование
 

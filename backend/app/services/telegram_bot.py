@@ -63,15 +63,18 @@ class TelegramBotService:
         }
         await self._post("sendMessage", payload)
 
-    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5, first_seen_after: str | None = None) -> None:
+    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5, first_seen_after: str | None = None) -> int:
         if not self.settings.telegram_alert_chat_id:
-            return
+            return 0
+        sent = 0
         for listing in repo.find_unnotified(limit, first_seen_after=first_seen_after):
             try:
                 await self.send_listing_alert(listing)
                 repo.mark_notified(listing.source, listing.external_id)
+                sent += 1
             except Exception as exc:
                 logger.warning("Telegram listing alert failed for %s: %s", listing.external_id, exc)
+        return sent
 
     async def send_listing_alert(self, listing: Listing) -> None:
         text = self._format_listing_alert(listing)

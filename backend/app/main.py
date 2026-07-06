@@ -20,17 +20,25 @@ research = ResearchService(MrktClient(settings), ListingRepository(), ResearchRu
 telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
 alerts_ready = False
+cycle_lock = asyncio.Lock()
+
+
+async def run_research_cycle() -> dict[str, int | bool]:
+    global alerts_ready
+    async with cycle_lock:
+        started_at = utc_now()
+        repo = ListingRepository()
+        baseline_count = 0
+        if not alerts_ready:
+            baseline_count = repo.mark_alert_baseline(first_seen_before=started_at)
+            alerts_ready = True
+        stored = await research.run()
+        sent = await telegram_bot.send_new_listing_alerts(repo, first_seen_after=started_at)
+        return {"stored": stored, "sent": sent, "baseline": baseline_count, "alerts_ready": alerts_ready}
 
 
 async def research_job() -> None:
-    global alerts_ready
-    started_at = utc_now()
-    repo = ListingRepository()
-    if not alerts_ready:
-        repo.mark_alert_baseline(first_seen_before=started_at)
-        alerts_ready = True
-    await research.run()
-    await telegram_bot.send_new_listing_alerts(repo, first_seen_after=started_at)
+    await run_research_cycle()
 
 app = FastAPI(title="Telegram NFT Research API")
 app.add_middleware(

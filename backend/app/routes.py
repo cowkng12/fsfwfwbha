@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
 from app.catalog import default_collection_names, get_catalog
+from app.config import get_settings
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
 from app.services.research import DealAnalyzer, ResearchService
@@ -82,6 +83,31 @@ def results(
 async def run_research(service: ResearchService = Depends(research_service)):
     count = await service.run()
     return {"stored": count}
+
+
+def require_cron_secret(secret: str | None, x_cron_secret: str | None) -> None:
+    expected = get_settings().cron_secret
+    if not expected:
+        raise HTTPException(status_code=503, detail="CRON_SECRET is not configured")
+    if secret != expected and x_cron_secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid cron secret")
+
+
+@router.get("/cron/research")
+@router.post("/cron/research")
+async def cron_research(
+    background_tasks: BackgroundTasks,
+    secret: str | None = Query(default=None),
+    wait: bool = Query(default=False),
+    x_cron_secret: str | None = Header(default=None),
+):
+    require_cron_secret(secret, x_cron_secret)
+    from app.main import run_research_cycle
+
+    if wait:
+        return await run_research_cycle()
+    background_tasks.add_task(run_research_cycle)
+    return {"queued": True}
 
 
 @router.post("/listings/clear")
