@@ -130,18 +130,23 @@ class ListingRepository:
                 (utc_now(), source, external_id),
             )
 
-    def mark_alert_baseline(self) -> int:
+    def mark_alert_baseline(self, first_seen_before: str | None = None) -> int:
         now = utc_now()
+        where = "WHERE notified_at IS NULL"
+        params: list[str] = []
+        if first_seen_before:
+            where += " AND (first_seen_at IS NULL OR first_seen_at < ?)"
+            params.append(first_seen_before)
         with connect() as conn:
-            row = conn.execute("SELECT COUNT(*) AS count FROM listings WHERE notified_at IS NULL").fetchone()
+            row = conn.execute(f"SELECT COUNT(*) AS count FROM listings {where}", params).fetchone()
             conn.execute(
-                """
+                f"""
                 INSERT OR IGNORE INTO notified_items (source, external_id, created_at)
-                SELECT source, external_id, ? FROM listings
+                SELECT source, external_id, ? FROM listings {where}
                 """,
-                (now,),
+                (now, *params),
             )
-            conn.execute("UPDATE listings SET notified_at = COALESCE(notified_at, ?)", (now,))
+            conn.execute(f"UPDATE listings SET notified_at = COALESCE(notified_at, ?) {where}", (now, *params))
         return int(row["count"] if row else 0)
 
     def clear_feed(self, archive_current: bool = True) -> int:

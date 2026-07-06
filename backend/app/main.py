@@ -25,12 +25,11 @@ alerts_ready = False
 async def research_job() -> None:
     global alerts_ready
     started_at = utc_now()
-    await research.run()
     repo = ListingRepository()
     if not alerts_ready:
-        repo.mark_alert_baseline()
+        repo.mark_alert_baseline(first_seen_before=started_at)
         alerts_ready = True
-        return
+    await research.run()
     await telegram_bot.send_new_listing_alerts(repo, first_seen_after=started_at)
 
 app = FastAPI(title="Telegram NFT Research API")
