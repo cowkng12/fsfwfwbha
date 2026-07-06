@@ -133,38 +133,41 @@ class TelegramBotService:
 
     def _format_activity(self, listing: Listing) -> str:
         parts: list[str] = []
-        if listing.last_sale_at and listing.last_sale_price is not None:
-            parts.append(f"Последняя перепродажа: {self._format_date(listing.last_sale_at)} за {self._format_money(listing.last_sale_price, listing.last_sale_currency)}")
-        if listing.initial_sale_at and (listing.initial_sale_price is not None or listing.initial_sale_stars is not None):
-            initial_price = self._format_money(listing.initial_sale_price, listing.initial_sale_currency) if listing.initial_sale_price is not None else "-"
-            stars = f" / {listing.initial_sale_stars} Stars" if listing.initial_sale_stars is not None else ""
-            parts.append(f"Первая продажа: {self._format_date(listing.initial_sale_at)} за {initial_price}{stars}")
+        parts.extend(self._format_sale_activity(listing))
         if listing.sales_count is not None:
-            parts.append(f"Продаж по данным MRKT: {listing.sales_count}")
-        uses = self._format_uses(listing.uses_count, listing.uses_total)
-        if uses:
-            parts.append(f"Юзы: {uses}")
-        if listing.received_at:
-            parts.append(f"Получен: {self._format_date(listing.received_at)}")
+            parts.append(f"Продаж MRKT: {listing.sales_count}")
         if listing.next_resale_at:
-            parts.append(f"Доступность перепродажи: {self._format_availability(listing.next_resale_at)}")
+            parts.append(f"Ресейл: {self._format_availability(listing.next_resale_at)}")
         if listing.next_transfer_at:
-            parts.append(f"Доступность передачи: {self._format_availability(listing.next_transfer_at)}")
+            parts.append(f"Трансфер: {self._format_availability(listing.next_transfer_at)}")
+        if listing.received_at:
+            parts.append(f"Получен: {self._format_days_ago(listing.received_at)}")
+        parts = parts[:5]
         if not parts:
             parts.append("Нет данных активности")
         return "\n".join(parts)
 
-    def _format_uses(self, count: int | None, total: int | None) -> str | None:
-        if count is None and total is None:
-            return None
-        if count is not None and total is not None:
-            return f"{self._format_int(count)} / {self._format_int(total)}"
-        if count is not None:
-            return self._format_int(count)
-        return f"всего {self._format_int(total)}"
-
-    def _format_int(self, value: int | None) -> str:
-        return f"{value:,}".replace(",", " ") if value is not None else "-"
+    def _format_sale_activity(self, listing: Listing) -> list[str]:
+        sales: list[tuple[str, str, str]] = []
+        if listing.last_sale_at and listing.last_sale_price is not None:
+            sales.append((
+                listing.last_sale_at,
+                "Продажа",
+                self._format_money(listing.last_sale_price, listing.last_sale_currency),
+            ))
+        if listing.initial_sale_at and (listing.initial_sale_price is not None or listing.initial_sale_stars is not None):
+            initial_price = (
+                self._format_money(listing.initial_sale_price, listing.initial_sale_currency)
+                if listing.initial_sale_price is not None
+                else "-"
+            )
+            stars = f" / {listing.initial_sale_stars} Stars" if listing.initial_sale_stars is not None else ""
+            sales.append((listing.initial_sale_at, "Первая", f"{initial_price}{stars}"))
+        sales.sort(key=lambda row: self._date_sort_key(row[0]), reverse=True)
+        return [
+            f"{index}. {label}: {price}, {self._format_days_ago(date)}"
+            for index, (date, label, price) in enumerate(sales[:5], start=1)
+        ]
 
     def _format_money(self, value: float | None, currency: str | None) -> str:
         if value is None:
@@ -173,20 +176,37 @@ class TelegramBotService:
         return f"{formatted} {currency or ''}".strip()
 
     def _format_date(self, value: str) -> str:
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
+        parsed = self._parse_datetime(value)
+        if not parsed:
             return value
         return parsed.strftime("%d.%m.%Y %H:%M UTC")
 
     def _format_availability(self, value: str) -> str:
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
+        parsed = self._parse_datetime(value)
+        if not parsed:
             return value
         if parsed <= datetime.now(timezone.utc):
             return "доступна"
         return self._format_date(value)
+
+    def _format_days_ago(self, value: str) -> str:
+        parsed = self._parse_datetime(value)
+        if not parsed:
+            return value
+        days = max(0, (datetime.now(timezone.utc).date() - parsed.date()).days)
+        return f"{days} дн назад"
+
+    def _date_sort_key(self, value: str) -> datetime:
+        return self._parse_datetime(value) or datetime.min.replace(tzinfo=timezone.utc)
+
+    def _parse_datetime(self, value: str) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
     async def _post(self, method: str, payload: dict) -> dict:
         if not self.settings.telegram_bot_token:
