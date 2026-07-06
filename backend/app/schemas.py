@@ -5,6 +5,10 @@ class FilterRequest(BaseModel):
     collection_names: list[str] = Field(default_factory=list)
     backdrop_names: list[str] = Field(default_factory=list)
     model_names: list[str] = Field(default_factory=list)
+    symbol_names: list[str] = Field(default_factory=list)
+    number: str | None = None
+    min_price: float | None = Field(default=None, ge=0)
+    max_price: float | None = Field(default=None, ge=0)
     limit: int = Field(default=60, ge=1, le=200)
 
 

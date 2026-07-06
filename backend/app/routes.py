@@ -56,6 +56,10 @@ def results(
     collectionNames: list[str] | None = Query(default=None),
     backdropNames: list[str] | None = Query(default=None),
     modelNames: list[str] | None = Query(default=None),
+    symbolNames: list[str] | None = Query(default=None),
+    number: str | None = Query(default=None),
+    minPrice: float | None = Query(default=None, ge=0),
+    maxPrice: float | None = Query(default=None, ge=0),
     limit: int = Query(default=60, ge=1, le=200),
     repo: ListingRepository = Depends(listing_repo),
 ):
@@ -63,6 +67,10 @@ def results(
         collection_names=parse_multi(collectionNames) or default_collection_names(),
         backdrop_names=parse_multi(backdropNames),
         model_names=parse_multi(modelNames),
+        symbol_names=parse_multi(symbolNames),
+        number=number.strip() if number and number.strip() else None,
+        min_price=minPrice,
+        max_price=maxPrice,
         limit=limit,
     )
     try:

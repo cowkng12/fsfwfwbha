@@ -16,6 +16,7 @@ export type Listing = {
   number?: string | null;
   model_name?: string | null;
   backdrop_name?: string | null;
+  symbol_name?: string | null;
   image_url?: string | null;
   price: number;
   floor_price?: number | null;
@@ -52,4 +53,8 @@ export type FilterState = {
   nfts: string[];
   backdrops: string[];
   models: string[];
+  symbols: string[];
+  number: string;
+  minPrice: string;
+  maxPrice: string;
 };

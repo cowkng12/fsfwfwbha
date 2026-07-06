@@ -8,13 +8,17 @@ export async function fetchCatalog(): Promise<Catalog> {
   return response.json();
 }
 
-const emptyFilters: FilterState = { nfts: [], backdrops: [], models: [] };
+export const emptyFilters: FilterState = { nfts: [], backdrops: [], models: [], symbols: [], number: '', minPrice: '', maxPrice: '' };
 
 export async function fetchResults(filters: FilterState = emptyFilters): Promise<{ items: Listing[]; last_research_at: string | null }> {
   const params = new URLSearchParams({ limit: '80' });
   filters.nfts.forEach((value) => params.append('collectionNames', value));
   filters.backdrops.forEach((value) => params.append('backdropNames', value));
   filters.models.forEach((value) => params.append('modelNames', value));
+  filters.symbols.forEach((value) => params.append('symbolNames', value));
+  if (filters.number.trim()) params.set('number', filters.number.trim());
+  if (filters.minPrice.trim()) params.set('minPrice', filters.minPrice.trim());
+  if (filters.maxPrice.trim()) params.set('maxPrice', filters.maxPrice.trim());
   const response = await fetch(`${API_BASE}/api/results?${params.toString()}`);
   if (!response.ok) throw new Error('Cannot load results');
   return response.json();

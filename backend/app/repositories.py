@@ -109,8 +109,20 @@ class ListingRepository:
         if filters.model_names:
             where.append(f"model_name IN ({','.join(['?'] * len(filters.model_names))})")
             params.extend(filters.model_names)
+        if filters.symbol_names:
+            where.append(f"symbol_name IN ({','.join(['?'] * len(filters.symbol_names))})")
+            params.extend(filters.symbol_names)
+        if filters.number:
+            where.append("number = ?")
+            params.append(filters.number)
+        if filters.min_price is not None:
+            where.append("price >= ?")
+            params.append(filters.min_price)
+        max_price = get_settings().mrkt_max_price
+        if filters.max_price is not None:
+            max_price = min(max_price, filters.max_price)
         where.append("price <= ?")
-        params.append(get_settings().mrkt_max_price)
+        params.append(max_price)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"

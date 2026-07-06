@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { BackdropCatalogItem, Catalog, FilterState, ModelCatalogItem, NftCatalogItem } from '../types';
 
+type SelectableFilterKey = 'nfts' | 'backdrops' | 'models';
+
 type Props = {
-  type: keyof FilterState;
+  type: SelectableFilterKey;
   catalog: Catalog;
   collectionImages: Map<string, string>;
   imagePool: string[];
@@ -11,7 +13,7 @@ type Props = {
   onApply: (values: string[]) => void;
 };
 
-const titles: Record<keyof FilterState, string> = {
+const titles: Record<SelectableFilterKey, string> = {
   nfts: 'NFT',
   backdrops: 'Фон',
   models: 'Модель'
@@ -70,7 +72,7 @@ export function FilterSheet({ type, catalog, collectionImages, imagePool, select
   );
 }
 
-function Icon({ item, type, index, collectionImages, imagePool }: { item: NftCatalogItem | BackdropCatalogItem | ModelCatalogItem; type: keyof FilterState; index: number; collectionImages: Map<string, string>; imagePool: string[] }) {
+function Icon({ item, type, index, collectionImages, imagePool }: { item: NftCatalogItem | BackdropCatalogItem | ModelCatalogItem; type: SelectableFilterKey; index: number; collectionImages: Map<string, string>; imagePool: string[] }) {
   if (type === 'backdrops' && 'color' in item) return <span className="color-icon" style={{ background: `radial-gradient(circle at 30% 20%, #fff4, transparent 35%), ${item.color}` }} />;
   const image = type === 'nfts' ? collectionImages.get(item.name) || imagePool[index % imagePool.length] : null;
   if (image) return <span className="mini-icon image-icon"><img src={image} alt="" /></span>;
