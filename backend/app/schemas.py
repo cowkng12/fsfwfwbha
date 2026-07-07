@@ -30,6 +30,8 @@ class Listing(BaseModel):
     uses_total: int | None = None
     combo_listed_count: int | None = None
     combo_floor_price: float | None = None
+    model_last_sale_at: str | None = None
+    model_recent_sales: str | None = None
     current_owner: str | None = None
     original_sender: str | None = None
     original_recipient: str | None = None

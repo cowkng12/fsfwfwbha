@@ -1,4 +1,5 @@
 import httpx
+import json
 import logging
 from datetime import datetime, timezone
 from html import escape
@@ -130,8 +131,8 @@ class TelegramBotService:
             f"Флор модели: <b>{model_floor} TON</b>",
             self._format_combo_market(listing),
             "",
-            "<b>Активность:</b>",
-            "<blockquote>" + escape(self._format_activity(listing)) + "</blockquote>",
+            "<b>Последние продажи модели:</b>",
+            "<blockquote>" + escape(self._format_model_sales(listing)) + "</blockquote>",
             self._format_links(listing, preview_url),
         ])
 
@@ -188,6 +189,29 @@ class TelegramBotService:
         if not parts:
             parts.append("Нет данных активности")
         return "\n".join(parts)
+
+    def _format_model_sales(self, listing: Listing) -> str:
+        try:
+            sales = json.loads(listing.model_recent_sales or "[]")
+        except json.JSONDecodeError:
+            sales = []
+        parts: list[str] = []
+        for sale in sales[:5]:
+            number = sale.get("number") or "-"
+            price = self._format_sale_ton(sale.get("price"))
+            platform = sale.get("platform") or "MRKT"
+            date = sale.get("date") or ""
+            parts.append(f"#{number} за {price} TON на {platform} - {self._format_days_ago(date)}")
+        return "\n".join(parts) if parts else "Нет свежих продаж модели"
+
+    def _format_sale_ton(self, value: float | int | str | None) -> str:
+        if value is None:
+            return "-"
+        try:
+            text = f"{float(value):.2f}".rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            return str(value)
+        return text if "." in text else f"{text}.0"
 
     def _format_listing_activity(self, listing: Listing) -> str:
         owner = listing.current_owner or "владелец неизвестен"

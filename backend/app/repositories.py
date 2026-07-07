@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from app.catalog import blocked_collection_model_pairs, collection_quality_rules
@@ -30,14 +30,15 @@ class ListingRepository:
                     source, external_id, collection_name, name, number, model_name,
                     backdrop_name, symbol_name, image_url, price, floor_price,
                     model_floor_price, sales_count, uses_count, uses_total,
-                    combo_listed_count, combo_floor_price, current_owner,
+                    combo_listed_count, combo_floor_price, model_last_sale_at,
+                    model_recent_sales, current_owner,
                     original_sender, original_recipient, original_gift_at,
                     last_sale_at, last_sale_price, last_sale_currency,
                     initial_sale_at, initial_sale_price, initial_sale_currency,
                     initial_sale_stars, received_at, export_at, next_resale_at,
                     next_transfer_at, marketplace_url, telegram_url, first_seen_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     collection_name=excluded.collection_name,
                     name=excluded.name,
@@ -54,6 +55,8 @@ class ListingRepository:
                     uses_total=excluded.uses_total,
                     combo_listed_count=excluded.combo_listed_count,
                     combo_floor_price=excluded.combo_floor_price,
+                    model_last_sale_at=excluded.model_last_sale_at,
+                    model_recent_sales=excluded.model_recent_sales,
                     current_owner=excluded.current_owner,
                     original_sender=excluded.original_sender,
                     original_recipient=excluded.original_recipient,
@@ -82,7 +85,8 @@ class ListingRepository:
                         row.get("floor_price"), row.get("model_floor_price"),
                         row.get("sales_count"), row.get("uses_count"),
                         row.get("uses_total"), row.get("combo_listed_count"),
-                        row.get("combo_floor_price"), row.get("current_owner"),
+                        row.get("combo_floor_price"), row.get("model_last_sale_at"),
+                        row.get("model_recent_sales"), row.get("current_owner"),
                         row.get("original_sender"), row.get("original_recipient"),
                         row.get("original_gift_at"), row.get("last_sale_at"),
                         row.get("last_sale_price"), row.get("last_sale_currency"),
@@ -126,6 +130,7 @@ class ListingRepository:
         params.append(max_price)
         self._append_blocked_model_filter(where, params)
         self._append_collection_quality_filter(where, params)
+        self._append_model_liquidity_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"
@@ -142,6 +147,7 @@ class ListingRepository:
         params: list[str | float | int] = [get_settings().mrkt_max_price]
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
+        liquidity_filter = self._model_liquidity_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -151,6 +157,7 @@ class ListingRepository:
                   AND price <= ?
                   {blocked_filter}
                   {quality_filter}
+                  {liquidity_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM hidden_items
                     WHERE hidden_items.source = listings.source
@@ -158,7 +165,11 @@ class ListingRepository:
                   )
                 ORDER BY first_seen_at DESC, updated_at DESC, price ASC
                 LIMIT ?
-                """.format(blocked_filter=blocked_filter, quality_filter=quality_filter),
+                """.format(
+                    blocked_filter=blocked_filter,
+                    quality_filter=quality_filter,
+                    liquidity_filter=liquidity_filter,
+                ),
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
@@ -171,6 +182,7 @@ class ListingRepository:
             params.append(first_seen_after)
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
+        liquidity_filter = self._model_liquidity_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -182,6 +194,7 @@ class ListingRepository:
                   {first_seen_filter}
                   {blocked_filter}
                   {quality_filter}
+                  {liquidity_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM notified_items
                     WHERE notified_items.source = listings.source
@@ -194,7 +207,12 @@ class ListingRepository:
                   )
                 ORDER BY first_seen_at DESC, updated_at DESC
                 LIMIT ?
-                """.format(first_seen_filter=first_seen_filter, blocked_filter=blocked_filter, quality_filter=quality_filter),
+                """.format(
+                    first_seen_filter=first_seen_filter,
+                    blocked_filter=blocked_filter,
+                    quality_filter=quality_filter,
+                    liquidity_filter=liquidity_filter,
+                ),
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
@@ -208,6 +226,19 @@ class ListingRepository:
         quality_filter = self._collection_quality_sql(params)
         if quality_filter:
             where.append(quality_filter.removeprefix("AND "))
+
+    def _append_model_liquidity_filter(self, where: list[str], params: list[str | float | int]) -> None:
+        liquidity_filter = self._model_liquidity_sql(params)
+        if liquidity_filter:
+            where.append(liquidity_filter.removeprefix("AND "))
+
+    def _model_liquidity_sql(self, params: list[str | float | int]) -> str:
+        days = get_settings().mrkt_model_sales_max_age_days
+        if days <= 0:
+            return ""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        params.append(cutoff)
+        return "AND model_last_sale_at IS NOT NULL AND model_last_sale_at >= ?"
 
     def _blocked_model_sql(self, params: list[str | float | int]) -> str:
         blocked = blocked_collection_model_pairs()

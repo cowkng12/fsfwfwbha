@@ -33,6 +33,8 @@ export type Listing = {
   uses_total?: number | null;
   combo_listed_count?: number | null;
   combo_floor_price?: number | null;
+  model_last_sale_at?: string | null;
+  model_recent_sales?: string | null;
   current_owner?: string | null;
   original_sender?: string | null;
   original_recipient?: string | null;

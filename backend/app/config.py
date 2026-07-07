@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     mrkt_min_model_floor: float = 25
     mrkt_max_model_rarity: float = 1.5
     mrkt_max_backdrop_rarity: float = 1.5
+    mrkt_model_sales_max_age_days: int = 7
     mrkt_min_gift_floor: float = 0
     mrkt_premium_backdrops: str = (
         "Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,"

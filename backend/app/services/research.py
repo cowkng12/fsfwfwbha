@@ -1,5 +1,6 @@
 import asyncio
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from hashlib import sha1
 from typing import Any
@@ -25,6 +26,8 @@ PRIORITY_MODEL_SCAN_LIMIT = 12
 PRIORITY_BACKDROP_SCAN_LIMIT = 24
 PRIORITY_FILTER_BATCH_SIZE = 4
 PRIORITY_FILTER_RESULT_COUNT = 5
+MODEL_SALE_SAMPLE_SIZE = 12
+MODEL_RECENT_SALES_LIMIT = 5
 PRIORITY_BACKDROP_ORDER = [
     "Onyx Black",
     "Black",
@@ -92,6 +95,7 @@ class ResearchService:
         self._model_floor_cache: dict[tuple[str, str], float | None] = {}
         self._combo_market_cache: dict[tuple[str, str, str], tuple[int | None, float | None]] = {}
         self._priority_model_cache: dict[str, list[str]] = {}
+        self._model_sales_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
     async def run(self, collection_names: list[str] | None = None) -> int:
         async with self._lock:
@@ -106,6 +110,9 @@ class ResearchService:
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
+                                await self._enrich_model_sales(listing, telegram_client)
+                                if not self._has_recent_model_sale(listing):
+                                    continue
                                 await self._enrich_combo_market(listing)
                                 await self._enrich_public_metadata(listing)
                                 await self._enrich_unique_gift_metadata(listing, telegram_client)
@@ -234,6 +241,8 @@ class ResearchService:
             "price": price or 0,
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
+            "model_last_sale_at": None,
+            "model_recent_sales": "[]",
             "sales_count": self._int_value(self._deep_pick(gift, "salesCount", "sales_count")),
             "uses_count": self._int_value(
                 self._deep_pick(
@@ -298,6 +307,70 @@ class ResearchService:
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
         return has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
+
+    async def _enrich_model_sales(self, listing: dict, client: TelegramClient | None) -> None:
+        sales = await self._model_recent_sales(
+            listing.get("collection_name"),
+            listing.get("model_name"),
+            client,
+        )
+        listing["model_recent_sales"] = json.dumps(sales, ensure_ascii=False)
+        listing["model_last_sale_at"] = sales[0]["date"] if sales else None
+
+    async def _model_recent_sales(
+        self,
+        collection: str | None,
+        model: str | None,
+        client: TelegramClient | None,
+    ) -> list[dict[str, Any]]:
+        if not collection or not model or not client:
+            return []
+        key = (collection, model)
+        if key in self._model_sales_cache:
+            return self._model_sales_cache[key]
+        try:
+            gifts = await self.mrkt.saling(
+                [collection],
+                model_names=[model],
+                count=MODEL_SALE_SAMPLE_SIZE,
+                use_default_max_price=False,
+            )
+        except Exception:
+            self._model_sales_cache[key] = []
+            return []
+
+        sales: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for gift in gifts:
+            number = str(self._deep_pick(gift, "number", "giftNumber", "num", "gift_num", "giftNum") or "") or None
+            gift_collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or collection
+            url = self._telegram_url(gift_collection, number)
+            slug = self._telegram_slug(url)
+            if not number or not slug or slug in seen:
+                continue
+            seen.add(slug)
+            try:
+                value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
+            except Exception:
+                continue
+            date = self._iso_datetime(getattr(value_info, "last_sale_date", None))
+            price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
+            if not date or price is None:
+                continue
+            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date})
+
+        sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        self._model_sales_cache[key] = sales[:MODEL_RECENT_SALES_LIMIT]
+        return self._model_sales_cache[key]
+
+    def _has_recent_model_sale(self, listing: dict) -> bool:
+        max_age_days = self.mrkt.settings.mrkt_model_sales_max_age_days
+        if max_age_days <= 0:
+            return True
+        parsed = self._parse_datetime(listing.get("model_last_sale_at"))
+        if not parsed:
+            return False
+        return parsed >= datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
     async def _enrich_combo_market(self, listing: dict) -> None:
         count, floor = await self._combo_market(
@@ -451,6 +524,17 @@ class ResearchService:
         if isinstance(value, datetime):
             return value.astimezone(timezone.utc).isoformat()
         return value if isinstance(value, str) and value else None
+
+    def _parse_datetime(self, value: Any) -> datetime | None:
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
     def _currency_amount(self, value: Any, currency: str | None) -> float | None:
         if value in (None, ""):

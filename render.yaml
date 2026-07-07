@@ -23,6 +23,8 @@ services:
         value: 1.5
       - key: MRKT_MAX_BACKDROP_RARITY
         value: 1.5
+      - key: MRKT_MODEL_SALES_MAX_AGE_DAYS
+        value: 7
       - key: MRKT_MIN_GIFT_FLOOR
         value: 0
       - key: MRKT_PREMIUM_BACKDROPS

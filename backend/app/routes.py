@@ -296,6 +296,7 @@ async def debug_mrkt(client=Depends(mrkt_client)):
         "mrkt_min_model_floor": settings.mrkt_min_model_floor,
         "mrkt_max_model_rarity": settings.mrkt_max_model_rarity,
         "mrkt_max_backdrop_rarity": settings.mrkt_max_backdrop_rarity,
+        "mrkt_model_sales_max_age_days": settings.mrkt_model_sales_max_age_days,
     }
     try:
         token = await client.token()
