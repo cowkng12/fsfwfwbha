@@ -1,17 +1,42 @@
 import type { Catalog, FilterState, GiftTraitCatalog, Listing } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+export const ACCESS_DENIED_MESSAGE = 'Вы не внесены в белый список бота.';
+
+type TelegramWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      initData?: string;
+    };
+  };
+};
+
+async function apiFetch(path: string, fallbackError: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  const initData = (window as TelegramWindow).Telegram?.WebApp?.initData;
+  if (initData) headers.set('X-Telegram-Init-Data', initData);
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (!response.ok) throw new Error(await errorMessage(response, fallbackError));
+  return response;
+}
+
+async function errorMessage(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    return typeof data.detail === 'string' ? data.detail : fallback;
+  } catch {
+    return response.status === 403 ? ACCESS_DENIED_MESSAGE : fallback;
+  }
+}
 
 export async function fetchCatalog(): Promise<Catalog> {
-  const response = await fetch(`${API_BASE}/api/catalog`);
-  if (!response.ok) throw new Error('Cannot load catalog');
+  const response = await apiFetch('/api/catalog', 'Cannot load catalog');
   return response.json();
 }
 
 export async function fetchGiftTraits(collectionName: string): Promise<GiftTraitCatalog> {
   const params = new URLSearchParams({ collectionName });
-  const response = await fetch(`${API_BASE}/api/catalog/traits?${params.toString()}`);
-  if (!response.ok) throw new Error('Cannot load gift traits');
+  const response = await apiFetch(`/api/catalog/traits?${params.toString()}`, 'Cannot load gift traits');
   return response.json();
 }
 
@@ -26,13 +51,11 @@ export async function fetchResults(filters: FilterState = emptyFilters): Promise
   if (filters.number.trim()) params.set('number', filters.number.trim());
   if (filters.minPrice.trim()) params.set('minPrice', filters.minPrice.trim());
   if (filters.maxPrice.trim()) params.set('maxPrice', filters.maxPrice.trim());
-  const response = await fetch(`${API_BASE}/api/results?${params.toString()}`);
-  if (!response.ok) throw new Error('Cannot load results');
+  const response = await apiFetch(`/api/results?${params.toString()}`, 'Cannot load results');
   return response.json();
 }
 
 export async function clearListings(): Promise<{ deleted: number; archived: boolean }> {
-  const response = await fetch(`${API_BASE}/api/listings/clear?confirm=true`, { method: 'POST' });
-  if (!response.ok) throw new Error('Cannot clear listings');
+  const response = await apiFetch('/api/listings/clear?confirm=true', 'Cannot clear listings', { method: 'POST' });
   return response.json();
 }

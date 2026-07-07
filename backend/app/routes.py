@@ -1,4 +1,8 @@
 import asyncio
+import hashlib
+import hmac
+import json
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
@@ -7,7 +11,7 @@ from app.config import get_settings
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
 from app.services.research import DealAnalyzer, ResearchService
-from app.services.telegram_bot import TelegramBotService
+from app.services.telegram_bot import TelegramBotService, WHITELIST_DENIED_MESSAGE
 
 router = APIRouter(prefix="/api")
 
@@ -43,18 +47,51 @@ def telegram_bot_service() -> TelegramBotService:
     return telegram_bot
 
 
+def require_allowed_telegram_user(x_telegram_init_data: str | None = Header(default=None)) -> None:
+    settings = get_settings()
+    allowed_user_ids = settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set
+    if not allowed_user_ids:
+        return
+    user_id = telegram_init_data_user_id(x_telegram_init_data, settings.telegram_bot_token)
+    if user_id not in allowed_user_ids:
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+
+
+def telegram_init_data_user_id(init_data: str | None, bot_token: str | None) -> int | None:
+    if not init_data or not bot_token:
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = pairs.pop("hash", None)
+    if not received_hash:
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_hash, received_hash):
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    try:
+        user = json.loads(pairs.get("user") or "{}")
+        return int(user.get("id"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE) from None
+
+
 @router.get("/health")
 def health():
     return {"ok": True}
 
 
 @router.get("/catalog")
-def catalog():
+def catalog(_: None = Depends(require_allowed_telegram_user)):
     return get_catalog()
 
 
 @router.get("/catalog/traits")
-async def catalog_traits(collectionName: str = Query(..., min_length=1), client=Depends(mrkt_client)):
+async def catalog_traits(
+    collectionName: str = Query(..., min_length=1),
+    _: None = Depends(require_allowed_telegram_user),
+    client=Depends(mrkt_client),
+):
     collection_names = collection_search_names(collectionName)
     try:
         models, backdrops, symbols = await asyncio.gather(
@@ -147,6 +184,7 @@ def results(
     minPrice: float | None = Query(default=None, ge=0),
     maxPrice: float | None = Query(default=None, ge=0),
     limit: int = Query(default=60, ge=1, le=200),
+    _: None = Depends(require_allowed_telegram_user),
     repo: ListingRepository = Depends(listing_repo),
 ):
     filters = FilterRequest(
@@ -205,7 +243,11 @@ async def cron_research(
 
 
 @router.post("/listings/clear")
-def clear_listings(confirm: bool = Query(default=False), repo: ListingRepository = Depends(listing_repo)):
+def clear_listings(
+    confirm: bool = Query(default=False),
+    _: None = Depends(require_allowed_telegram_user),
+    repo: ListingRepository = Depends(listing_repo),
+):
     if not confirm:
         raise HTTPException(status_code=400, detail="Pass confirm=true to clear listings")
     deleted = repo.clear_feed(archive_current=True)

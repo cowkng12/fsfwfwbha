@@ -8,6 +8,7 @@ from app.repositories import ListingRepository
 from app.schemas import Listing
 
 logger = logging.getLogger(__name__)
+WHITELIST_DENIED_MESSAGE = "Вы не внесены в белый список бота."
 
 
 class TelegramBotService:
@@ -47,6 +48,7 @@ class TelegramBotService:
         user_id = (message.get("from") or {}).get("id")
         if not self._is_allowed(chat_id, user_id):
             logger.info("Ignoring Telegram update from non-whitelisted chat=%s user=%s", chat_id, user_id)
+            await self.send_not_whitelisted(chat_id)
             return
         if text.startswith("/start"):
             await self.send_start(chat_id)
@@ -74,6 +76,9 @@ class TelegramBotService:
             },
         }
         await self._post("sendMessage", payload)
+
+    async def send_not_whitelisted(self, chat_id: int) -> None:
+        await self._post("sendMessage", {"chat_id": chat_id, "text": WHITELIST_DENIED_MESSAGE})
 
     async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5, first_seen_after: str | None = None) -> int:
         if not self.settings.telegram_alert_chat_id:

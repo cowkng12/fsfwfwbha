@@ -12,6 +12,8 @@ button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
 
 .app-shell { max-width: 520px; min-height: 100vh; margin: 0 auto; padding: 18px 18px 104px; background: #181a19; }
+.access-shell { display: grid; place-items: center; padding-bottom: 18px; }
+.access-message { width: 100%; padding: 22px 18px; border-radius: 14px; background: #2b2c2b; border: 1px solid #484a48; color: #fff; font-size: 18px; font-weight: 850; line-height: 1.3; text-align: center; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .topbar h1 { margin: 0; font-size: 28px; line-height: 1; }
 .eyebrow { margin: 0 0 6px; color: #9aa0a0; font-size: 13px; }

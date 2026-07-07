@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { clearListings, emptyFilters, fetchCatalog, fetchResults } from './api';
+import { ACCESS_DENIED_MESSAGE, clearListings, emptyFilters, fetchCatalog, fetchResults } from './api';
 import type { Catalog, FilterState, Listing } from './types';
 import { ResultGrid } from './components/ResultGrid';
 import { GiftPickerSheet } from './components/GiftPickerSheet';
@@ -10,11 +10,20 @@ export function App() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [lastResearchAt, setLastResearchAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const handleError = (error: unknown) => {
+    if (error instanceof Error && error.message === ACCESS_DENIED_MESSAGE) {
+      setAccessDenied(true);
+      return;
+    }
+    console.error(error);
+  };
+
   useEffect(() => {
-    fetchCatalog().then(setCatalog).catch(console.error);
+    fetchCatalog().then(setCatalog).catch(handleError);
   }, []);
 
   useEffect(() => {
@@ -26,7 +35,7 @@ export function App() {
           setLastResearchAt(data.last_research_at);
         }
       })
-      .catch(console.error)
+      .catch(handleError)
       .finally(() => !ignore && setLoading(false));
     setLoading(true);
     load();
@@ -65,10 +74,23 @@ export function App() {
   const clearFeed = async () => {
     const confirmed = window.confirm('Очистить текущую ленту? Уже найденные лоты будут добавлены в историю, чтобы бот не прислал их повторно.');
     if (!confirmed) return;
-    await clearListings();
+    try {
+      await clearListings();
+    } catch (error) {
+      handleError(error);
+      return;
+    }
     setItems([]);
     setLastResearchAt(null);
   };
+
+  if (accessDenied) {
+    return (
+      <main className="app-shell access-shell">
+        <section className="access-message">{ACCESS_DENIED_MESSAGE}</section>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
