@@ -229,7 +229,7 @@ class ListingRepository:
             return ""
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         params.append(cutoff)
-        return "AND model_last_sale_at IS NOT NULL AND model_last_sale_at >= ?"
+        return "AND (model_last_sale_at IS NULL OR model_last_sale_at >= ?)"
 
     def _blocked_model_sql(self, params: list[str | float | int]) -> str:
         blocked = blocked_collection_model_pairs()
