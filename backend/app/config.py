@@ -11,13 +11,19 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/app.sqlite3"
     cors_origins: str = "http://localhost:5173"
     mrkt_api_url: str = "https://api.tgmrkt.io/api/v1"
-    mrkt_max_price: float = 50
-    mrkt_min_model_floor: float = 50
+    mrkt_max_price: float = 35
+    mrkt_research_max_price: float = 38
+    mrkt_min_model_floor: float = 35
     mrkt_min_gift_floor: float = 0
     mrkt_premium_backdrops: str = (
-        "Black,White,Platinum,Silver,Electric Purple,Cyberpunk,Electric Indigo,Neon Blue,"
-        "Azure Blue,Sapphire,Sky Blue,Mint Green,Emerald,Malachite,Aquamarine,Pacific Green,"
-        "Lavender,Purple,Violet,Gold,Pure Gold,Satin Gold,Ruby,Crimson,Fuchsia,Magenta"
+        "Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,"
+        "Chestnut,Chocolate,Cobalt Blue,Copper,Crimson,Cyberpunk,Dark Green,Dark Lilac,"
+        "Deep Cyan,Desert Sand,Electric Indigo,Electric Purple,Emerald,English Violet,"
+        "Fandango,Feldgrau,Fire Engine,French Blue,French Violet,Fuchsia,Gold,Gunmetal,"
+        "Hunter Green,Indigo Dye,Lavender,Magenta,Malachite,Midnight Blue,Mint Green,"
+        "Mustard,Mystic Pearl,Neon Blue,Onyx Black,Orange,Pacific Green,Platinum,Pure Gold,"
+        "Purple,Ruby,Sapphire,Satin Gold,Shamrock Green,Silver,Sky Blue,Steel Grey,Turquoise,"
+        "Violet,White"
     )
     research_interval_seconds: int = 180
     keepalive_interval_seconds: int = 240

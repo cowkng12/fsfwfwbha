@@ -10,49 +10,32 @@ BLOCKED_COLLECTION_MODELS = {
 }
 COLLECTION_QUALITY_RULES = {
     "liberty figure": {
+        "require_model": True,
         "models": {
             "homeland",
             "maga",
             "marilyn",
             "ifather",
             "moonwalker",
-            "baywatch",
-            "rebel royal",
-            "psycho",
-            "oppenheimer",
-            "warhol",
         },
         "backdrops": {
             "amber",
             "aquamarine",
             "azure blue",
-            "battleship grey",
             "black",
-            "burgundy",
-            "carmine",
-            "chestnut",
             "crimson",
             "cyberpunk",
-            "dark green",
-            "deep cyan",
             "electric purple",
             "electric indigo",
             "emerald",
-            "fire engine",
             "fuchsia",
             "gold",
-            "gunmetal",
-            "hunter green",
-            "indigo dye",
             "lavender",
             "magenta",
             "malachite",
             "mint green",
-            "midnight blue",
-            "mustard",
-            "mystic pearl",
             "neon blue",
-            "orange",
+            "onyx black",
             "pacific green",
             "platinum",
             "pure gold",
@@ -60,10 +43,7 @@ COLLECTION_QUALITY_RULES = {
             "ruby",
             "sapphire",
             "satin gold",
-            "shamrock green",
             "silver",
-            "steel grey",
-            "turquoise",
             "violet",
             "white",
         },
@@ -96,8 +76,13 @@ def blocked_collection_model_pairs() -> set[tuple[str, str]]:
     return BLOCKED_COLLECTION_MODELS
 
 
-def collection_quality_rules() -> dict[str, dict[str, set[str]]]:
+def collection_quality_rules() -> dict[str, dict[str, Any]]:
     return COLLECTION_QUALITY_RULES
+
+
+def collection_requires_priority_model(collection_name: str | None) -> bool:
+    rule = COLLECTION_QUALITY_RULES.get(_normalize_name(collection_name))
+    return bool(rule and rule.get("require_model"))
 
 
 def is_blocked_collection_model(collection_name: str | None, model_name: str | None) -> bool:
@@ -119,6 +104,8 @@ def is_priority_collection_backdrop(collection_name: str | None, backdrop_name: 
 
 
 def has_collection_specific_quality(collection_name: str | None, model_name: str | None, backdrop_name: str | None) -> bool:
+    if collection_requires_priority_model(collection_name):
+        return is_priority_collection_model(collection_name, model_name)
     return is_priority_collection_model(collection_name, model_name) or is_priority_collection_backdrop(collection_name, backdrop_name)
 
 

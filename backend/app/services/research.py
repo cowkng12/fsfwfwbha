@@ -68,7 +68,7 @@ class ResearchService:
             try:
                 for name in collections:
                     try:
-                        gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_max_price)
+                        gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_research_max_price)
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
@@ -151,7 +151,7 @@ class ResearchService:
             return False
         if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
             return False
-        if listing["price"] > self.mrkt.settings.mrkt_max_price:
+        if listing["price"] > self.mrkt.settings.mrkt_research_max_price:
             return False
         if has_collection_quality_rules(listing.get("collection_name")):
             return has_collection_specific_quality(

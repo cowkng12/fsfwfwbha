@@ -16,18 +16,18 @@ export function ResultGrid({ items, loading, error }: Props) {
   }
 
   if (!visible.length) {
-    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Нет листингов до 50 TON или MRKT токен не авторизован.'}</div>;
+    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Нет листингов до 35 TON или MRKT токен не авторизован.'}</div>;
   }
 
   return (
     <section className="grid">
-      {visible.map((item, index) => {
+      {visible.map((item) => {
         const imageUrl = fragmentImageUrl(item) || item.image_url!;
         const visualUrl = item.telegram_url || imageUrl;
         const combo = formatCombo(item);
         const coverStyle: CoverStyle = { '--cover-bg': coverColor(item.backdrop_name || item.collection_name) };
         return (
-          <article className={isFresh(item, index) ? 'nft-card is-new' : 'nft-card'} key={`${item.source}-${item.external_id}`}>
+          <article className={isFresh(item) ? 'nft-card is-new' : 'nft-card'} key={`${item.source}-${item.external_id}`}>
             <div className="nft-art" style={coverStyle}>
               <span className="nft-badge">#{item.number ?? item.external_id.slice(0, 6)}</span>
               <img src={imageUrl} alt={`${item.collection_name} #${item.number ?? ''}`} loading="lazy" />
@@ -105,8 +105,7 @@ function openExternal(event: MouseEvent<HTMLAnchorElement>, url: string) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-function isFresh(item: Listing, index: number) {
-  if (index < 2) return true;
+function isFresh(item: Listing) {
   if (!item.first_seen_at) return false;
   return Date.now() - new Date(item.first_seen_at).getTime() < 60 * 60 * 1000;
 }

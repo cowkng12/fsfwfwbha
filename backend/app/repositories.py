@@ -164,7 +164,7 @@ class ListingRepository:
         return [Listing(**dict(row), deal_score=0) for row in rows]
 
     def find_unnotified(self, limit: int = 5, first_seen_after: str | None = None) -> list[Listing]:
-        params: list[str | int] = []
+        params: list[str | float | int] = [get_settings().mrkt_max_price]
         first_seen_filter = ""
         if first_seen_after:
             first_seen_filter = "AND first_seen_at >= ?"
@@ -178,6 +178,7 @@ class ListingRepository:
                 WHERE notified_at IS NULL
                   AND image_url IS NOT NULL
                   AND price > 0
+                  AND price <= ?
                   {first_seen_filter}
                   {blocked_filter}
                   {quality_filter}
@@ -225,14 +226,20 @@ class ListingRepository:
         clauses: list[str] = []
         for collection_name, rule in collection_quality_rules().items():
             model_placeholders = ",".join("?" for _ in rule["models"])
+            params.append(collection_name)
+            params.extend(sorted(rule["models"]))
+            if rule.get("require_model"):
+                clauses.append(
+                    "(LOWER(TRIM(COALESCE(collection_name, ''))) = ? "
+                    f"AND LOWER(TRIM(COALESCE(model_name, ''))) NOT IN ({model_placeholders}))"
+                )
+                continue
             backdrop_placeholders = ",".join("?" for _ in rule["backdrops"])
             clauses.append(
                 "(LOWER(TRIM(COALESCE(collection_name, ''))) = ? "
                 f"AND NOT (LOWER(TRIM(COALESCE(model_name, ''))) IN ({model_placeholders}) "
                 f"OR LOWER(TRIM(COALESCE(backdrop_name, ''))) IN ({backdrop_placeholders})))"
             )
-            params.append(collection_name)
-            params.extend(sorted(rule["models"]))
             params.extend(sorted(rule["backdrops"]))
         return f"AND NOT ({' OR '.join(clauses)})" if clauses else ""
 

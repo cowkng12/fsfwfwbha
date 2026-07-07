@@ -292,13 +292,14 @@ async def debug_mrkt(client=Depends(mrkt_client)):
         "has_telegram_session": bool(settings.telegram_session),
         "has_mrkt_auth_token": bool(settings.mrkt_auth_token),
         "mrkt_max_price": settings.mrkt_max_price,
+        "mrkt_research_max_price": settings.mrkt_research_max_price,
     }
     try:
         token = await client.token()
         debug_items = []
         first_gift = None
         for collection in default_collection_names():
-            gifts = await client.saling([collection], count=3, max_price=settings.mrkt_max_price)
+            gifts = await client.saling([collection], count=3, max_price=settings.mrkt_research_max_price)
             debug_items.append({"collection": collection, "gift_count": len(gifts)})
             if gifts and first_gift is None:
                 first_gift = gifts[0]
