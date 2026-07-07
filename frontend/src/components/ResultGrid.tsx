@@ -34,8 +34,8 @@ export function ResultGrid({ items, loading, error }: Props) {
             </div>
             <div className="card-body">
               <h2>🎁 {item.collection_name}</h2>
-              <p className="trait-line">🎲 {item.model_name || 'Модель не указана'} <mark>{formatPercent(item.model_floor_price, item.price)}</mark></p>
-              <p className="trait-line">🖼 {item.backdrop_name || 'Фон не указан'} <mark>{formatPercent(item.floor_price, item.price)}</mark></p>
+              <p className="trait-line">🎲 {item.model_name || 'Модель не указана'}</p>
+              <p className="trait-line">🖼 {item.backdrop_name || 'Фон не указан'}</p>
               {combo && <p className="combo-line">🧩 {combo}</p>}
               <p className="price-line">💎 {formatPrice(item.price)} TON</p>
               <div className="card-actions">
@@ -53,11 +53,6 @@ export function ResultGrid({ items, loading, error }: Props) {
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
-}
-
-function formatPercent(floor: number | null | undefined, price: number) {
-  if (!floor || !price) return '';
-  return `${Math.round((price / floor) * 100)}%`;
 }
 
 function formatCombo(item: Listing) {
