@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
-from app.catalog import default_collection_names, get_catalog
+from app.catalog import default_collection_names, get_catalog, is_blocked_collection_model
 from app.config import get_settings
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
@@ -101,8 +101,13 @@ async def catalog_traits(
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    normalized_models = [
+        item
+        for item in (normalize_model(item) for item in models)
+        if not is_blocked_collection_model(collectionName, item["name"])
+    ]
     return {
-        "models": sorted((normalize_model(item) for item in models), key=trait_sort_key),
+        "models": sorted(normalized_models, key=trait_sort_key),
         "backdrops": sorted((normalize_backdrop(item) for item in backdrops), key=trait_sort_key),
         "symbols": sorted((normalize_symbol(item) for item in symbols), key=trait_sort_key),
     }

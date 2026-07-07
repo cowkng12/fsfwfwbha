@@ -9,7 +9,7 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
 
-from app.catalog import default_collection_names
+from app.catalog import default_collection_names, is_blocked_collection_model
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
@@ -143,6 +143,8 @@ class ResearchService:
 
     def _is_quality_listing(self, listing: dict) -> bool:
         if not listing.get("image_url") or not listing.get("price"):
+            return False
+        if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
             return False
         if listing["price"] > self.mrkt.settings.mrkt_max_price:
             return False

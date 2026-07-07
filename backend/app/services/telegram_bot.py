@@ -122,6 +122,7 @@ class TelegramBotService:
             f"{title_html} на <b>MRKT</b> за",
             f"<b>{self._format_ton(listing.price)} TON</b>",
             f"Фон: <b>{escape(listing.backdrop_name or 'не указан')}</b>",
+            f"Модель: <b>{escape(listing.model_name or 'не указана')}</b>",
             "",
             "<b>Владельцы:</b>",
             "<blockquote>" + escape(self._format_owners(listing)) + "</blockquote>",

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Iterable
 
+from app.catalog import blocked_collection_model_pairs
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
@@ -123,6 +124,7 @@ class ListingRepository:
             max_price = min(max_price, filters.max_price)
         where.append("price <= ?")
         params.append(max_price)
+        self._append_blocked_model_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"
@@ -141,6 +143,7 @@ class ListingRepository:
         if first_seen_after:
             first_seen_filter = "AND first_seen_at >= ?"
             params.append(first_seen_after)
+        blocked_filter = self._blocked_model_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -149,6 +152,7 @@ class ListingRepository:
                   AND image_url IS NOT NULL
                   AND price > 0
                   {first_seen_filter}
+                  {blocked_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM notified_items
                     WHERE notified_items.source = listings.source
@@ -161,10 +165,25 @@ class ListingRepository:
                   )
                 ORDER BY first_seen_at DESC, updated_at DESC
                 LIMIT ?
-                """.format(first_seen_filter=first_seen_filter),
+                """.format(first_seen_filter=first_seen_filter, blocked_filter=blocked_filter),
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
+
+    def _append_blocked_model_filter(self, where: list[str], params: list[str | float | int]) -> None:
+        blocked_filter = self._blocked_model_sql(params)
+        if blocked_filter:
+            where.append(blocked_filter.removeprefix("AND "))
+
+    def _blocked_model_sql(self, params: list[str | float | int]) -> str:
+        blocked = blocked_collection_model_pairs()
+        if not blocked:
+            return ""
+        clauses: list[str] = []
+        for collection_name, model_name in sorted(blocked):
+            clauses.append("(LOWER(TRIM(COALESCE(collection_name, ''))) = ? AND LOWER(TRIM(COALESCE(model_name, ''))) = ?)")
+            params.extend([collection_name, model_name])
+        return f"AND NOT ({' OR '.join(clauses)})"
 
     def mark_notified(self, source: str, external_id: str) -> None:
         with connect() as conn:
