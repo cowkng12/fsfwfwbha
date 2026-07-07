@@ -107,5 +107,6 @@ function openExternal(event: MouseEvent<HTMLAnchorElement>, url: string) {
 
 function isFresh(item: Listing) {
   if (!item.first_seen_at) return false;
-  return Date.now() - new Date(item.first_seen_at).getTime() < 60 * 60 * 1000;
+  const ageMs = Date.now() - new Date(item.first_seen_at).getTime();
+  return ageMs >= 0 && ageMs < 60 * 60 * 1000;
 }

@@ -687,4 +687,4 @@ class DealAnalyzer:
             item.floor_price = item.floor_price or floors.get(item.collection_name)
             if item.floor_price and item.price:
                 item.deal_score = round((item.floor_price / item.price) * 100, 2)
-        return sorted(listings, key=lambda row: (row.collection_name, row.price))
+        return sorted(listings, key=lambda row: row.first_seen_at or row.updated_at or "", reverse=True)
