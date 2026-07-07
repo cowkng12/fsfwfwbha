@@ -10,14 +10,47 @@ from telethon.sessions import StringSession
 from telethon.tl import functions, types
 
 from app.catalog import (
+    collection_requires_priority_model,
     default_collection_names,
     has_collection_quality_rules,
     has_collection_specific_quality,
     is_blocked_collection_model,
+    priority_collection_search_models,
 )
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
+
+PRIORITY_MODEL_SCAN_LIMIT = 12
+PRIORITY_BACKDROP_SCAN_LIMIT = 24
+PRIORITY_FILTER_BATCH_SIZE = 4
+PRIORITY_FILTER_RESULT_COUNT = 5
+PRIORITY_BACKDROP_ORDER = [
+    "Onyx Black",
+    "Black",
+    "White",
+    "Platinum",
+    "Gold",
+    "Pure Gold",
+    "Sapphire",
+    "Ruby",
+    "Emerald",
+    "Cyberpunk",
+    "Electric Indigo",
+    "Electric Purple",
+    "Neon Blue",
+    "Silver",
+    "Amber",
+    "Aquamarine",
+    "Azure Blue",
+    "Pacific Green",
+    "Malachite",
+    "Fuchsia",
+    "Magenta",
+    "Lavender",
+    "Purple",
+    "Violet",
+]
 
 
 class GiftTableParser(HTMLParser):
@@ -58,6 +91,7 @@ class ResearchService:
         self._collection_floor_cache: dict[str, float | None] = {}
         self._model_floor_cache: dict[tuple[str, str], float | None] = {}
         self._combo_market_cache: dict[tuple[str, str, str], tuple[int | None, float | None]] = {}
+        self._priority_model_cache: dict[str, list[str]] = {}
 
     async def run(self, collection_names: list[str] | None = None) -> int:
         async with self._lock:
@@ -68,7 +102,7 @@ class ResearchService:
             try:
                 for name in collections:
                     try:
-                        gifts = await self.mrkt.saling([name], max_price=self.mrkt.settings.mrkt_research_max_price)
+                        gifts = await self._candidate_gifts(name)
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
@@ -84,6 +118,96 @@ class ResearchService:
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count
+
+    async def _candidate_gifts(self, collection: str) -> list[dict[str, Any]]:
+        max_price = self.mrkt.settings.mrkt_research_max_price
+        gifts = await self.mrkt.saling([collection], max_price=max_price)
+
+        model_names = await self._priority_model_names(collection)
+        if model_names:
+            gifts.extend(await self._filtered_gifts(collection, "model", model_names, max_price))
+
+        if not collection_requires_priority_model(collection):
+            backdrop_names = self._priority_backdrop_names()
+            if backdrop_names:
+                gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
+
+        return self._dedupe_gifts(gifts)
+
+    async def _priority_model_names(self, collection: str) -> list[str]:
+        if collection in self._priority_model_cache:
+            return self._priority_model_cache[collection]
+        if has_collection_quality_rules(collection):
+            models = priority_collection_search_models(collection)
+        else:
+            models = await self._market_priority_model_names(collection)
+        self._priority_model_cache[collection] = models
+        return models
+
+    async def _market_priority_model_names(self, collection: str) -> list[str]:
+        try:
+            models = await self.mrkt.gift_trait_options("models", [collection])
+        except Exception:
+            return []
+        ranked: list[tuple[float, float, str]] = []
+        for item in models:
+            name = item.get("modelTitle") or item.get("modelName")
+            if not name:
+                continue
+            floor = self._nano_price(item.get("floorPriceNanoTons")) or 0
+            rarity = self._rarity_value(item.get("rarityPerMille")) or 999
+            if floor >= self.mrkt.settings.mrkt_min_model_floor or rarity <= self.mrkt.settings.mrkt_max_model_rarity:
+                ranked.append((-floor, rarity, name))
+        ranked.sort(key=lambda row: (row[0], row[1], row[2]))
+        return [name for _, _, name in ranked[:PRIORITY_MODEL_SCAN_LIMIT]]
+
+    def _priority_backdrop_names(self) -> list[str]:
+        premium = {name.lower(): name for name in self.mrkt.settings.premium_backdrop_list}
+        ordered = [premium[name.lower()] for name in PRIORITY_BACKDROP_ORDER if name.lower() in premium]
+        ordered.extend(name for key, name in premium.items() if key not in {item.lower() for item in ordered})
+        return ordered[:PRIORITY_BACKDROP_SCAN_LIMIT]
+
+    async def _filtered_gifts(self, collection: str, kind: str, names: list[str], max_price: float) -> list[dict[str, Any]]:
+        gifts: list[dict[str, Any]] = []
+        for batch in self._chunks(names, PRIORITY_FILTER_BATCH_SIZE):
+            try:
+                gifts.extend(await self._saling_by_filter(collection, kind, batch, max_price))
+            except Exception:
+                for name in batch:
+                    try:
+                        gifts.extend(await self._saling_by_filter(collection, kind, [name], max_price))
+                    except Exception:
+                        continue
+        return gifts
+
+    async def _saling_by_filter(self, collection: str, kind: str, names: list[str], max_price: float) -> list[dict[str, Any]]:
+        if kind == "model":
+            return await self.mrkt.saling(
+                [collection],
+                model_names=names,
+                count=PRIORITY_FILTER_RESULT_COUNT,
+                max_price=max_price,
+            )
+        return await self.mrkt.saling(
+            [collection],
+            backdrop_names=names,
+            count=PRIORITY_FILTER_RESULT_COUNT,
+            max_price=max_price,
+        )
+
+    def _chunks(self, items: list[str], size: int):
+        for index in range(0, len(items), size):
+            yield items[index:index + size]
+
+    def _dedupe_gifts(self, gifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        unique: dict[str, dict[str, Any]] = {}
+        for gift in gifts:
+            unique.setdefault(self._gift_key(gift), gift)
+        return list(unique.values())
+
+    def _gift_key(self, gift: dict[str, Any]) -> str:
+        key = self._pick(gift, "id", "giftIdString", "giftId", "slug")
+        return str(key or sha1(repr(gift).encode()).hexdigest())
 
     async def _normalize_gift(self, gift: dict[str, Any], fallback_collection: str) -> dict:
         collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or fallback_collection
@@ -102,7 +226,9 @@ class ResearchService:
             "name": f"{collection} #{number}" if number else collection,
             "number": number,
             "model_name": model_name,
+            "model_rarity": self._rarity_value(self._deep_pick(gift, "modelRarityPerMille", "modelRarity")),
             "backdrop_name": backdrop_name,
+            "backdrop_rarity": self._rarity_value(self._deep_pick(gift, "backdropRarityPerMille", "backdropRarity")),
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
             "image_url": self._fragment_image_url(collection, number) or self._image_url(gift),
             "price": price or 0,
@@ -161,13 +287,17 @@ class ResearchService:
             )
         gift_floor = listing.get("floor_price")
         model_floor = listing.get("model_floor_price")
+        model_rarity = listing.get("model_rarity")
+        backdrop_rarity = listing.get("backdrop_rarity")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
             return False
         premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
         backdrop = str(listing.get("backdrop_name") or "").lower()
         has_premium_backdrop = backdrop in premium_backdrops
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
-        return has_premium_backdrop or has_expensive_model
+        has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
+        has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
+        return has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
 
     async def _enrich_combo_market(self, listing: dict) -> None:
         count, floor = await self._combo_market(
@@ -366,6 +496,22 @@ class ResearchService:
         if "nano" in joined or price > 1_000_000:
             return round(price / 1_000_000_000, 4)
         return price
+
+    def _nano_price(self, value: Any) -> float | None:
+        if value in (None, ""):
+            return None
+        try:
+            return round(float(value) / 1_000_000_000, 4)
+        except (TypeError, ValueError):
+            return None
+
+    def _rarity_value(self, value: Any) -> float | None:
+        if value in (None, ""):
+            return None
+        try:
+            return round(float(value) / 10, 2)
+        except (TypeError, ValueError):
+            return None
 
     def _int_value(self, value: Any) -> int | None:
         if value in (None, ""):

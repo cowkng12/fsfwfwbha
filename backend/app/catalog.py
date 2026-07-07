@@ -18,6 +18,13 @@ COLLECTION_QUALITY_RULES = {
             "ifather",
             "moonwalker",
         },
+        "search_models": {
+            "Homeland",
+            "MAGA",
+            "Marilyn",
+            "iFather",
+            "Moonwalker",
+        },
         "backdrops": {
             "amber",
             "aquamarine",
@@ -78,6 +85,13 @@ def blocked_collection_model_pairs() -> set[tuple[str, str]]:
 
 def collection_quality_rules() -> dict[str, dict[str, Any]]:
     return COLLECTION_QUALITY_RULES
+
+
+def priority_collection_search_models(collection_name: str | None) -> list[str]:
+    rule = COLLECTION_QUALITY_RULES.get(_normalize_name(collection_name))
+    if not rule:
+        return []
+    return sorted(rule.get("search_models") or rule["models"])
 
 
 def collection_requires_priority_model(collection_name: str | None) -> bool:

@@ -293,6 +293,9 @@ async def debug_mrkt(client=Depends(mrkt_client)):
         "has_mrkt_auth_token": bool(settings.mrkt_auth_token),
         "mrkt_max_price": settings.mrkt_max_price,
         "mrkt_research_max_price": settings.mrkt_research_max_price,
+        "mrkt_min_model_floor": settings.mrkt_min_model_floor,
+        "mrkt_max_model_rarity": settings.mrkt_max_model_rarity,
+        "mrkt_max_backdrop_rarity": settings.mrkt_max_backdrop_rarity,
     }
     try:
         token = await client.token()
