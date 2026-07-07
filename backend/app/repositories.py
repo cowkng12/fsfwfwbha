@@ -137,6 +137,29 @@ class ListingRepository:
             rows = conn.execute(sql, params).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
 
+    def find_recent(self, limit: int = 80) -> list[Listing]:
+        params: list[str | float | int] = [get_settings().mrkt_max_price]
+        blocked_filter = self._blocked_model_sql(params)
+        with connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM listings
+                WHERE image_url IS NOT NULL
+                  AND price > 0
+                  AND price <= ?
+                  {blocked_filter}
+                  AND NOT EXISTS (
+                    SELECT 1 FROM hidden_items
+                    WHERE hidden_items.source = listings.source
+                      AND hidden_items.external_id = listings.external_id
+                  )
+                ORDER BY first_seen_at DESC, updated_at DESC, price ASC
+                LIMIT ?
+                """.format(blocked_filter=blocked_filter),
+                (*params, limit),
+            ).fetchall()
+        return [Listing(**dict(row), deal_score=0) for row in rows]
+
     def find_unnotified(self, limit: int = 5, first_seen_after: str | None = None) -> list[Listing]:
         params: list[str | int] = []
         first_seen_filter = ""

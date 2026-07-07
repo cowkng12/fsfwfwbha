@@ -13,11 +13,21 @@ type TelegramWindow = Window & {
 
 async function apiFetch(path: string, fallbackError: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
-  const initData = (window as TelegramWindow).Telegram?.WebApp?.initData;
+  const initData = telegramInitData();
   if (initData) headers.set('X-Telegram-Init-Data', initData);
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) throw new Error(await errorMessage(response, fallbackError));
   return response;
+}
+
+function telegramInitData() {
+  const webAppData = (window as TelegramWindow).Telegram?.WebApp?.initData;
+  if (webAppData) return webAppData;
+  for (const value of [window.location.hash.slice(1), window.location.search.slice(1)]) {
+    const initData = new URLSearchParams(value).get('tgWebAppData');
+    if (initData) return initData;
+  }
+  return '';
 }
 
 async function errorMessage(response: Response, fallback: string) {

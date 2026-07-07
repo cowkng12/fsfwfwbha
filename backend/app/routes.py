@@ -192,20 +192,27 @@ def results(
     _: None = Depends(require_allowed_telegram_user),
     repo: ListingRepository = Depends(listing_repo),
 ):
+    collection_names = parse_multi(collectionNames)
+    backdrop_names = parse_multi(backdropNames)
+    model_names = parse_multi(modelNames)
+    symbol_names = parse_multi(symbolNames)
+    normalized_number = number.strip() if number and number.strip() else None
     filters = FilterRequest(
-        collection_names=parse_multi(collectionNames) or default_collection_names(),
-        backdrop_names=parse_multi(backdropNames),
-        model_names=parse_multi(modelNames),
-        symbol_names=parse_multi(symbolNames),
-        number=number.strip() if number and number.strip() else None,
+        collection_names=collection_names or default_collection_names(),
+        backdrop_names=backdrop_names,
+        model_names=model_names,
+        symbol_names=symbol_names,
+        number=normalized_number,
         min_price=minPrice,
         max_price=maxPrice,
         limit=limit,
     )
+    has_filters = any([collection_names, backdrop_names, model_names, symbol_names, normalized_number, minPrice, maxPrice])
     try:
-        items = DealAnalyzer().apply_scores(repo.find(filters))
-    except Exception:
-        items = []
+        listings = repo.find(filters) if has_filters else repo.find_recent(limit)
+        items = DealAnalyzer().apply_scores(listings)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Cannot load results") from exc
     items = [item for item in items if item.source != "test" and item.image_url and "picsum.photos" not in item.image_url]
     if not any(item.image_url for item in items):
         items = []

@@ -11,6 +11,7 @@ export function App() {
   const [lastResearchAt, setLastResearchAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -19,6 +20,7 @@ export function App() {
       setAccessDenied(true);
       return;
     }
+    setLoadError('Не получилось загрузить листинги. Открой бота заново или попробуй позже.');
     console.error(error);
   };
 
@@ -31,6 +33,7 @@ export function App() {
     const load = () => fetchResults(filters)
       .then((data) => {
         if (!ignore) {
+          setLoadError(null);
           setItems(data.items);
           setLastResearchAt(data.last_research_at);
         }
@@ -105,7 +108,7 @@ export function App() {
         <button className="clear-button" onClick={clearFeed}>Очистить</button>
       </div>
 
-      <ResultGrid items={visibleItems} loading={loading} />
+      <ResultGrid items={visibleItems} loading={loading} error={loadError} />
 
       <footer className="footer-note">
         {lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ожидание первого ресерча'}
