@@ -94,8 +94,14 @@ class TelegramBotService:
             "chat_id": self.settings.telegram_alert_chat_id,
             "text": text,
             "parse_mode": "HTML",
-            "disable_web_page_preview": True,
         }
+        if listing.telegram_url:
+            payload["link_preview_options"] = {
+                "is_disabled": False,
+                "url": listing.telegram_url,
+                "prefer_large_media": True,
+                "show_above_text": False,
+            }
         if listing.marketplace_url:
             payload["reply_markup"] = {"inline_keyboard": [[{"text": "Открыть лот", "url": listing.marketplace_url}]]}
         await self._post("sendMessage", payload)
