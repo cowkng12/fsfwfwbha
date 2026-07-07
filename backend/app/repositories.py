@@ -130,7 +130,6 @@ class ListingRepository:
         params.append(max_price)
         self._append_blocked_model_filter(where, params)
         self._append_collection_quality_filter(where, params)
-        self._append_model_liquidity_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"
@@ -147,7 +146,6 @@ class ListingRepository:
         params: list[str | float | int] = [get_settings().mrkt_max_price]
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
-        liquidity_filter = self._model_liquidity_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -157,7 +155,6 @@ class ListingRepository:
                   AND price <= ?
                   {blocked_filter}
                   {quality_filter}
-                  {liquidity_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM hidden_items
                     WHERE hidden_items.source = listings.source
@@ -168,7 +165,6 @@ class ListingRepository:
                 """.format(
                     blocked_filter=blocked_filter,
                     quality_filter=quality_filter,
-                    liquidity_filter=liquidity_filter,
                 ),
                 (*params, limit),
             ).fetchall()
@@ -226,11 +222,6 @@ class ListingRepository:
         quality_filter = self._collection_quality_sql(params)
         if quality_filter:
             where.append(quality_filter.removeprefix("AND "))
-
-    def _append_model_liquidity_filter(self, where: list[str], params: list[str | float | int]) -> None:
-        liquidity_filter = self._model_liquidity_sql(params)
-        if liquidity_filter:
-            where.append(liquidity_filter.removeprefix("AND "))
 
     def _model_liquidity_sql(self, params: list[str | float | int]) -> str:
         days = get_settings().mrkt_model_sales_max_age_days

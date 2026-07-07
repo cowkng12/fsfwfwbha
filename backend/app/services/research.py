@@ -22,11 +22,11 @@ from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
 
-PRIORITY_MODEL_SCAN_LIMIT = 12
-PRIORITY_BACKDROP_SCAN_LIMIT = 24
+PRIORITY_MODEL_SCAN_LIMIT = 24
+PRIORITY_BACKDROP_SCAN_LIMIT = 48
 PRIORITY_FILTER_BATCH_SIZE = 4
-PRIORITY_FILTER_RESULT_COUNT = 5
-MODEL_SALE_SAMPLE_SIZE = 12
+PRIORITY_FILTER_RESULT_COUNT = 8
+MODEL_SALE_SAMPLE_SIZE = 16
 MODEL_RECENT_SALES_LIMIT = 5
 PRIORITY_BACKDROP_ORDER = [
     "Onyx Black",
@@ -111,8 +111,6 @@ class ResearchService:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
                                 await self._enrich_model_sales(listing, telegram_client)
-                                if not self._has_recent_model_sale(listing):
-                                    continue
                                 await self._enrich_combo_market(listing)
                                 await self._enrich_public_metadata(listing)
                                 await self._enrich_unique_gift_metadata(listing, telegram_client)

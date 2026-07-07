@@ -15,15 +15,11 @@ COLLECTION_QUALITY_RULES = {
             "homeland",
             "maga",
             "marilyn",
-            "ifather",
-            "moonwalker",
         },
         "search_models": {
             "Homeland",
             "MAGA",
             "Marilyn",
-            "iFather",
-            "Moonwalker",
         },
         "backdrops": {
             "amber",

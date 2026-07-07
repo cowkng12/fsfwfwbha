@@ -237,7 +237,14 @@ class TelegramBotService:
         if not parsed:
             return value
         days = max(0, (datetime.now(timezone.utc).date() - parsed.date()).days)
-        return f"{days} дн назад"
+        return f"{days} {self._day_word(days)} назад"
+
+    def _day_word(self, value: int) -> str:
+        if value % 10 == 1 and value % 100 != 11:
+            return "день"
+        if value % 10 in {2, 3, 4} and value % 100 not in {12, 13, 14}:
+            return "дня"
+        return "дней"
 
     def _date_sort_key(self, value: str) -> datetime:
         return self._parse_datetime(value) or datetime.min.replace(tzinfo=timezone.utc)
