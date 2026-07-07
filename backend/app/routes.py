@@ -6,7 +6,14 @@ from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
-from app.catalog import default_collection_names, get_catalog, is_blocked_collection_model
+from app.catalog import (
+    default_collection_names,
+    get_catalog,
+    has_collection_quality_rules,
+    is_blocked_collection_model,
+    is_priority_collection_backdrop,
+    is_priority_collection_model,
+)
 from app.config import get_settings
 from app.repositories import ListingRepository
 from app.schemas import FilterRequest, ResultsResponse
@@ -106,9 +113,19 @@ async def catalog_traits(
         for item in (normalize_model(item) for item in models)
         if not is_blocked_collection_model(collectionName, item["name"])
     ]
+    normalized_backdrops = [normalize_backdrop(item) for item in backdrops]
+    if has_collection_quality_rules(collectionName):
+        normalized_models = [
+            item for item in normalized_models
+            if is_priority_collection_model(collectionName, item["name"])
+        ]
+        normalized_backdrops = [
+            item for item in normalized_backdrops
+            if is_priority_collection_backdrop(collectionName, item["name"])
+        ]
     return {
         "models": sorted(normalized_models, key=trait_sort_key),
-        "backdrops": sorted((normalize_backdrop(item) for item in backdrops), key=trait_sort_key),
+        "backdrops": sorted(normalized_backdrops, key=trait_sort_key),
         "symbols": sorted((normalize_symbol(item) for item in symbols), key=trait_sort_key),
     }
 

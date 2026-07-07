@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Iterable
 
-from app.catalog import blocked_collection_model_pairs
+from app.catalog import blocked_collection_model_pairs, collection_quality_rules
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
@@ -125,6 +125,7 @@ class ListingRepository:
         where.append("price <= ?")
         params.append(max_price)
         self._append_blocked_model_filter(where, params)
+        self._append_collection_quality_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
 
         sql = "SELECT * FROM listings"
@@ -140,6 +141,7 @@ class ListingRepository:
     def find_recent(self, limit: int = 80) -> list[Listing]:
         params: list[str | float | int] = [get_settings().mrkt_max_price]
         blocked_filter = self._blocked_model_sql(params)
+        quality_filter = self._collection_quality_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -148,6 +150,7 @@ class ListingRepository:
                   AND price > 0
                   AND price <= ?
                   {blocked_filter}
+                  {quality_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM hidden_items
                     WHERE hidden_items.source = listings.source
@@ -155,7 +158,7 @@ class ListingRepository:
                   )
                 ORDER BY first_seen_at DESC, updated_at DESC, price ASC
                 LIMIT ?
-                """.format(blocked_filter=blocked_filter),
+                """.format(blocked_filter=blocked_filter, quality_filter=quality_filter),
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
@@ -167,6 +170,7 @@ class ListingRepository:
             first_seen_filter = "AND first_seen_at >= ?"
             params.append(first_seen_after)
         blocked_filter = self._blocked_model_sql(params)
+        quality_filter = self._collection_quality_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -176,6 +180,7 @@ class ListingRepository:
                   AND price > 0
                   {first_seen_filter}
                   {blocked_filter}
+                  {quality_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM notified_items
                     WHERE notified_items.source = listings.source
@@ -188,7 +193,7 @@ class ListingRepository:
                   )
                 ORDER BY first_seen_at DESC, updated_at DESC
                 LIMIT ?
-                """.format(first_seen_filter=first_seen_filter, blocked_filter=blocked_filter),
+                """.format(first_seen_filter=first_seen_filter, blocked_filter=blocked_filter, quality_filter=quality_filter),
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
@@ -198,15 +203,38 @@ class ListingRepository:
         if blocked_filter:
             where.append(blocked_filter.removeprefix("AND "))
 
+    def _append_collection_quality_filter(self, where: list[str], params: list[str | float | int]) -> None:
+        quality_filter = self._collection_quality_sql(params)
+        if quality_filter:
+            where.append(quality_filter.removeprefix("AND "))
+
     def _blocked_model_sql(self, params: list[str | float | int]) -> str:
         blocked = blocked_collection_model_pairs()
         if not blocked:
             return ""
         clauses: list[str] = []
         for collection_name, model_name in sorted(blocked):
-            clauses.append("(LOWER(TRIM(COALESCE(collection_name, ''))) = ? AND LOWER(TRIM(COALESCE(model_name, ''))) = ?)")
+            clauses.append(
+                "(LOWER(TRIM(COALESCE(collection_name, ''))) = ? "
+                "AND LOWER(TRIM(COALESCE(model_name, ''))) = ?)"
+            )
             params.extend([collection_name, model_name])
         return f"AND NOT ({' OR '.join(clauses)})"
+
+    def _collection_quality_sql(self, params: list[str | float | int]) -> str:
+        clauses: list[str] = []
+        for collection_name, rule in collection_quality_rules().items():
+            model_placeholders = ",".join("?" for _ in rule["models"])
+            backdrop_placeholders = ",".join("?" for _ in rule["backdrops"])
+            clauses.append(
+                "(LOWER(TRIM(COALESCE(collection_name, ''))) = ? "
+                f"AND NOT (LOWER(TRIM(COALESCE(model_name, ''))) IN ({model_placeholders}) "
+                f"OR LOWER(TRIM(COALESCE(backdrop_name, ''))) IN ({backdrop_placeholders})))"
+            )
+            params.append(collection_name)
+            params.extend(sorted(rule["models"]))
+            params.extend(sorted(rule["backdrops"]))
+        return f"AND NOT ({' OR '.join(clauses)})" if clauses else ""
 
     def mark_notified(self, source: str, external_id: str) -> None:
         with connect() as conn:

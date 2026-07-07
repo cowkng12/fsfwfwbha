@@ -9,7 +9,12 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
 
-from app.catalog import default_collection_names, is_blocked_collection_model
+from app.catalog import (
+    default_collection_names,
+    has_collection_quality_rules,
+    has_collection_specific_quality,
+    is_blocked_collection_model,
+)
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
@@ -148,6 +153,12 @@ class ResearchService:
             return False
         if listing["price"] > self.mrkt.settings.mrkt_max_price:
             return False
+        if has_collection_quality_rules(listing.get("collection_name")):
+            return has_collection_specific_quality(
+                listing.get("collection_name"),
+                listing.get("model_name"),
+                listing.get("backdrop_name"),
+            )
         gift_floor = listing.get("floor_price")
         model_floor = listing.get("model_floor_price")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):

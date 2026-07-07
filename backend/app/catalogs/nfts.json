@@ -8,5 +8,6 @@
   {"id":"sharp-tongue","name":"Sharp Tongue","image":""},
   {"id":"gem-signet","name":"Gem Signet","image":""},
   {"id":"ion-gem","name":"Ion Gem","image":""},
-  {"id":"swiss-watch","name":"Swiss Watch","image":"","searchNames":["Swiss Watch","Smiss Watch"]}
+  {"id":"swiss-watch","name":"Swiss Watch","image":"","searchNames":["Swiss Watch","Smiss Watch"]},
+  {"id":"liberty-figure","name":"Liberty Figure","image":""}
 ]
