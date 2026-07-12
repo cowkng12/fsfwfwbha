@@ -22,10 +22,10 @@ from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
 
-PRIORITY_MODEL_SCAN_LIMIT = 32
-PRIORITY_BACKDROP_SCAN_LIMIT = 56
+PRIORITY_MODEL_SCAN_LIMIT = 64
+PRIORITY_BACKDROP_SCAN_LIMIT = 80
 PRIORITY_FILTER_BATCH_SIZE = 4
-PRIORITY_FILTER_RESULT_COUNT = 10
+PRIORITY_FILTER_RESULT_COUNT = 16
 MODEL_SALE_SAMPLE_SIZE = 16
 MODEL_RECENT_SALES_LIMIT = 5
 PRIORITY_BACKDROP_ORDER = [
@@ -54,6 +54,37 @@ PRIORITY_BACKDROP_ORDER = [
     "Purple",
     "Violet",
 ]
+MODEL_PALETTE_HINTS: dict[str, set[str]] = {
+    "beret": {"black", "grey", "white"},
+    "bumblebee": {"yellow", "black"},
+    "lady bits": {"pink", "purple", "white"},
+    "megavolt": {"blue", "purple", "cyan"},
+    "sweet kiss": {"pink", "white", "purple"},
+    "anniversary": {"gold", "white", "silver"},
+    "art project": {"purple", "pink", "white"},
+    "ring of roots": {"green", "brown"},
+    "asteroid": {"grey", "silver", "black"},
+    "goldsmith": {"gold", "yellow"},
+    "hourglass": {"gold", "brown", "silver"},
+    "neo matrix": {"green", "black", "blue"},
+    "spatial grid": {"blue", "silver", "grey"},
+    "fireball": {"red", "orange", "yellow"},
+    "highway": {"grey", "black", "blue"},
+}
+COLOR_KEYWORDS: dict[str, set[str]] = {
+    "gold": {"gold", "amber", "mustard", "yellow", "pure gold", "satin gold"},
+    "silver": {"silver", "platinum", "grey", "gray", "steel", "gunmetal", "battleship grey", "white", "pearl"},
+    "black": {"black", "onyx", "midnight", "dark"},
+    "blue": {"blue", "azure", "indigo", "cyan", "navy", "sapphire", "cobalt", "pacific", "sky"},
+    "green": {"green", "emerald", "malachite", "hunter", "mint", "shamrock"},
+    "red": {"red", "crimson", "ruby", "burgundy", "carmine", "fire"},
+    "purple": {"purple", "violet", "lilac", "fandango", "magenta", "fuchsia", "lavender", "indigo"},
+    "brown": {"brown", "chestnut", "chocolate", "copper", "desert", "sand"},
+    "pink": {"pink", "blush", "rose", "kiss"},
+    "cyan": {"cyan", "aquamarine", "turquoise", "teal", "aqua"},
+    "orange": {"orange"},
+    "white": {"white", "pearl"},
+}
 
 
 class GiftTableParser(HTMLParser):
@@ -298,6 +329,11 @@ class ResearchService:
         backdrop_rarity = listing.get("backdrop_rarity")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
             return False
+        if listing["price"] <= self.mrkt.settings.mrkt_max_price and self._has_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+        ):
+            return True
         premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
         backdrop = str(listing.get("backdrop_name") or "").lower()
         has_premium_backdrop = backdrop in premium_backdrops
@@ -305,6 +341,13 @@ class ResearchService:
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
         return has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
+
+    def _has_color_harmony(self, model_name: str | None, backdrop_name: str | None) -> bool:
+        model_palette = self._palette_for_model(model_name)
+        backdrop_palette = self._palette_for_backdrop(backdrop_name)
+        if not model_palette or not backdrop_palette:
+            return False
+        return bool(model_palette & backdrop_palette)
 
     async def _enrich_model_sales(self, listing: dict, client: TelegramClient | None) -> None:
         sales = await self._model_recent_sales(
@@ -649,6 +692,34 @@ class ResearchService:
                 if found not in (None, ""):
                     return found
         return None
+
+    def _palette_for_model(self, model_name: str | None) -> set[str]:
+        normalized = self._normalize_name(model_name)
+        if not normalized:
+            return set()
+        if normalized in MODEL_PALETTE_HINTS:
+            return MODEL_PALETTE_HINTS[normalized]
+        return self._palette_from_text(normalized)
+
+    def _palette_for_backdrop(self, backdrop_name: str | None) -> set[str]:
+        normalized = self._normalize_name(backdrop_name)
+        if not normalized:
+            return set()
+        return self._palette_from_text(normalized)
+
+    def _palette_from_text(self, text: str) -> set[str]:
+        palette: set[str] = set()
+        for family, keywords in COLOR_KEYWORDS.items():
+            if any(keyword in text for keyword in keywords):
+                palette.add(family)
+        if "grey" in text or "gray" in text or "steel" in text or "gunmetal" in text:
+            palette.add("silver")
+        if "dark" in text and "black" not in palette:
+            palette.update({"black", "silver"})
+        return palette
+
+    def _normalize_name(self, value: str | None) -> str:
+        return " ".join(str(value or "").strip().lower().split())
 
     def _image_url(self, data: Any) -> str | None:
         if isinstance(data, dict):

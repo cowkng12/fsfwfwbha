@@ -11,11 +11,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/app.sqlite3"
     cors_origins: str = "http://localhost:5173"
     mrkt_api_url: str = "https://api.tgmrkt.io/api/v1"
-    mrkt_max_price: float = 35
-    mrkt_research_max_price: float = 38
-    mrkt_min_model_floor: float = 25
-    mrkt_max_model_rarity: float = 1.5
-    mrkt_max_backdrop_rarity: float = 1.5
+    mrkt_max_price: float = 10
+    mrkt_research_max_price: float = 10
+    mrkt_min_model_floor: float = 8
+    mrkt_max_model_rarity: float = 3
+    mrkt_max_backdrop_rarity: float = 3
     mrkt_model_sales_max_age_days: int = 7
     mrkt_min_gift_floor: float = 0
     mrkt_premium_backdrops: str = (

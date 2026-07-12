@@ -9,5 +9,17 @@
   {"id":"gem-signet","name":"Gem Signet","image":""},
   {"id":"ion-gem","name":"Ion Gem","image":""},
   {"id":"swiss-watch","name":"Swiss Watch","image":"","searchNames":["Swiss Watch","Smiss Watch"]},
-  {"id":"liberty-figure","name":"Liberty Figure","image":""}
+  {"id":"liberty-figure","name":"Liberty Figure","image":""},
+  {"id":"vice-cream","name":"Vice Cream","image":"","searchNames":["Vice Cream","Ice Cream"]},
+  {"id":"instant-ramen","name":"Instant Ramen","image":""},
+  {"id":"pool-float","name":"Pool Float","image":""},
+  {"id":"money-pot","name":"Money Pot","image":""},
+  {"id":"happy-browneyz","name":"Happy Browneyz","image":"","searchNames":["Happy Browneyz","Happy Brownie","Happy BrownieZ"]},
+  {"id":"victory-medal","name":"Victory Medal","image":""},
+  {"id":"cookie-heart","name":"Cookie Heart","image":""},
+  {"id":"pretty-pose","name":"Pretty Pose","image":""},
+  {"id":"restless-jar","name":"Restless Jar","image":""},
+  {"id":"snoop-dog","name":"Snoop Dog","image":"","searchNames":["Snoop Dog","Snoop Dogg"]},
+  {"id":"evil-eye","name":"Evil Eye","image":""},
+  {"id":"surge-boat","name":"Surge Boat","image":""}
 ]

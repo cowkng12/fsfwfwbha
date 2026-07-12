@@ -77,6 +77,26 @@ function Test-TelegramStringSessionFormat {
     return [bool]($Session -match '^1[A-Za-z0-9+/=_-]{80,}$')
 }
 
+function Normalize-TelegramStringSession {
+    param([string]$Session)
+
+    if (-not $Session) {
+        return $null
+    }
+
+    $trimmed = $Session.Trim()
+    if (Test-TelegramStringSessionFormat -Session $trimmed) {
+        return $trimmed
+    }
+
+    $match = [regex]::Match($trimmed, '1[A-Za-z0-9+/=_-]{80,}')
+    if ($match.Success) {
+        return $match.Value
+    }
+
+    return $trimmed
+}
+
 function New-TelegramStringSession {
     param(
         [string]$ApiId,
@@ -141,7 +161,7 @@ asyncio.run(main())
             throw "Telegram session generation failed. Check that backend dependencies are installed: pip install -r backend/requirements.txt"
         }
 
-        $session = (Get-Content -Path $tmpOut -Raw -Encoding UTF8).Trim()
+        $session = Normalize-TelegramStringSession -Session (Get-Content -Path $tmpOut -Raw -Encoding UTF8)
         if (-not $session) {
             throw "Telegram session generation did not produce a session string."
         }
@@ -303,7 +323,7 @@ if ($Prompt) {
 
 $effectiveApiId = if ($TelegramApiId) { $TelegramApiId } else { Get-EnvValue -Lines $lines -Key "TELEGRAM_API_ID" }
 $effectiveApiHash = if ($TelegramApiHash) { $TelegramApiHash } else { Get-EnvValue -Lines $lines -Key "TELEGRAM_API_HASH" }
-$effectiveTelegramSession = if ($TelegramSession) { $TelegramSession } else { Get-EnvValue -Lines $lines -Key "TELEGRAM_SESSION" }
+$effectiveTelegramSession = if ($TelegramSession) { Normalize-TelegramStringSession -Session $TelegramSession } else { Normalize-TelegramStringSession -Session (Get-EnvValue -Lines $lines -Key "TELEGRAM_SESSION") }
 
 if ($GenerateTelegramSession) {
     if (-not $TelegramPhoneNumber) {
@@ -318,6 +338,9 @@ if ($FetchMrktToken) {
     }
     if (-not $TelegramSession) {
         $TelegramSession = $effectiveTelegramSession
+    }
+    else {
+        $TelegramSession = Normalize-TelegramStringSession -Session $TelegramSession
     }
     if (-not (Test-TelegramStringSessionFormat -Session $TelegramSession)) {
         throw "TELEGRAM_SESSION in .env is not a valid Telethon StringSession. Run with -GenerateTelegramSession first."

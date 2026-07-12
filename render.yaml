@@ -14,15 +14,15 @@ services:
       - key: MRKT_API_URL
         value: https://api.tgmrkt.io/api/v1
       - key: MRKT_MAX_PRICE
-        value: 35
+        value: 10
       - key: MRKT_RESEARCH_MAX_PRICE
-        value: 38
+        value: 10
       - key: MRKT_MIN_MODEL_FLOOR
-        value: 25
+        value: 8
       - key: MRKT_MAX_MODEL_RARITY
-        value: 1.5
+        value: 3
       - key: MRKT_MAX_BACKDROP_RARITY
-        value: 1.5
+        value: 3
       - key: MRKT_MODEL_SALES_MAX_AGE_DAYS
         value: 7
       - key: MRKT_MIN_GIFT_FLOOR
