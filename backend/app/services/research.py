@@ -22,10 +22,10 @@ from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
 from app.services.mrkt_client import MrktClient
 
-PRIORITY_MODEL_SCAN_LIMIT = 64
-PRIORITY_BACKDROP_SCAN_LIMIT = 80
+PRIORITY_MODEL_SCAN_LIMIT = 96
+PRIORITY_BACKDROP_SCAN_LIMIT = 120
 PRIORITY_FILTER_BATCH_SIZE = 4
-PRIORITY_FILTER_RESULT_COUNT = 16
+PRIORITY_FILTER_RESULT_COUNT = 20
 MODEL_SALE_SAMPLE_SIZE = 16
 MODEL_RECENT_SALES_LIMIT = 5
 PRIORITY_BACKDROP_ORDER = [
@@ -53,6 +53,17 @@ PRIORITY_BACKDROP_ORDER = [
     "Lavender",
     "Purple",
     "Violet",
+    "Rose Gold",
+    "Coral",
+    "Peach",
+    "Teal",
+    "Navy Blue",
+    "Olive",
+    "Bronze",
+    "Lilac",
+    "Sea Foam",
+    "Cloud White",
+    "Sunset Orange",
 ]
 MODEL_PALETTE_HINTS: dict[str, set[str]] = {
     "beret": {"black", "grey", "white"},
@@ -70,19 +81,29 @@ MODEL_PALETTE_HINTS: dict[str, set[str]] = {
     "spatial grid": {"blue", "silver", "grey"},
     "fireball": {"red", "orange", "yellow"},
     "highway": {"grey", "black", "blue"},
+    "chrome": {"silver", "grey", "black"},
+    "halo": {"gold", "white", "silver"},
+    "prism": {"blue", "purple", "cyan", "silver"},
+    "velvet": {"purple", "red", "black"},
+    "orbit": {"blue", "black", "silver"},
+    "bloom": {"pink", "green", "white"},
+    "mosaic": {"blue", "purple", "gold"},
+    "neon": {"blue", "purple", "cyan"},
+    "ribbon": {"red", "pink", "gold"},
+    "coral": {"red", "orange", "pink"},
 }
 COLOR_KEYWORDS: dict[str, set[str]] = {
-    "gold": {"gold", "amber", "mustard", "yellow", "pure gold", "satin gold"},
-    "silver": {"silver", "platinum", "grey", "gray", "steel", "gunmetal", "battleship grey", "white", "pearl"},
-    "black": {"black", "onyx", "midnight", "dark"},
+    "gold": {"gold", "amber", "mustard", "yellow", "pure gold", "satin gold", "rose gold", "bronze"},
+    "silver": {"silver", "platinum", "grey", "gray", "steel", "gunmetal", "battleship grey", "white", "pearl", "chrome", "cloud"},
+    "black": {"black", "onyx", "midnight", "dark", "navy"},
     "blue": {"blue", "azure", "indigo", "cyan", "navy", "sapphire", "cobalt", "pacific", "sky"},
-    "green": {"green", "emerald", "malachite", "hunter", "mint", "shamrock"},
+    "green": {"green", "emerald", "malachite", "hunter", "mint", "shamrock", "olive", "sea foam"},
     "red": {"red", "crimson", "ruby", "burgundy", "carmine", "fire"},
     "purple": {"purple", "violet", "lilac", "fandango", "magenta", "fuchsia", "lavender", "indigo"},
-    "brown": {"brown", "chestnut", "chocolate", "copper", "desert", "sand"},
-    "pink": {"pink", "blush", "rose", "kiss"},
-    "cyan": {"cyan", "aquamarine", "turquoise", "teal", "aqua"},
-    "orange": {"orange"},
+    "brown": {"brown", "chestnut", "chocolate", "copper", "desert", "sand", "bronze"},
+    "pink": {"pink", "blush", "rose", "kiss", "peach", "coral"},
+    "cyan": {"cyan", "aquamarine", "turquoise", "teal", "aqua", "sea foam"},
+    "orange": {"orange", "sunset", "peach", "coral"},
     "white": {"white", "pearl"},
 }
 
@@ -126,6 +147,7 @@ class ResearchService:
         self._model_floor_cache: dict[tuple[str, str], float | None] = {}
         self._combo_market_cache: dict[tuple[str, str, str], tuple[int | None, float | None]] = {}
         self._priority_model_cache: dict[str, list[str]] = {}
+        self._relaxed_model_cache: dict[str, list[str]] = {}
         self._model_sales_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
     async def run(self, collection_names: list[str] | None = None) -> int:
@@ -148,6 +170,8 @@ class ResearchService:
                                 normalized.append(listing)
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
+                if not normalized:
+                    normalized.extend(await self._relaxed_listings(collections, telegram_client))
             finally:
                 if telegram_client:
                     await telegram_client.disconnect()
@@ -167,6 +191,37 @@ class ResearchService:
             backdrop_names = self._priority_backdrop_names()
             if backdrop_names:
                 gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
+
+        return self._dedupe_gifts(gifts)
+
+    async def _relaxed_listings(self, collections: list[str], telegram_client: TelegramClient | None) -> list[dict]:
+        normalized: list[dict] = []
+        for name in collections:
+            try:
+                gifts = await self._relaxed_candidate_gifts(name)
+                for gift in gifts:
+                    listing = await self._normalize_gift(gift, name)
+                    if self._is_relaxed_quality_listing(listing):
+                        await self._enrich_model_sales(listing, telegram_client)
+                        await self._enrich_combo_market(listing)
+                        await self._enrich_public_metadata(listing)
+                        await self._enrich_unique_gift_metadata(listing, telegram_client)
+                        normalized.append(listing)
+            except Exception as exc:
+                self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
+        return normalized
+
+    async def _relaxed_candidate_gifts(self, collection: str) -> list[dict[str, Any]]:
+        max_price = self.mrkt.settings.mrkt_research_max_price
+        gifts = await self.mrkt.saling([collection], max_price=max_price)
+
+        model_names = await self._relaxed_model_names(collection)
+        if model_names:
+            gifts.extend(await self._filtered_gifts(collection, "model", model_names, max_price))
+
+        backdrop_names = self._priority_backdrop_names()
+        if backdrop_names:
+            gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
 
         return self._dedupe_gifts(gifts)
 
@@ -196,6 +251,29 @@ class ResearchService:
                 ranked.append((-floor, rarity, name))
         ranked.sort(key=lambda row: (row[0], row[1], row[2]))
         return [name for _, _, name in ranked[:PRIORITY_MODEL_SCAN_LIMIT]]
+
+    async def _relaxed_model_names(self, collection: str) -> list[str]:
+        if collection in self._relaxed_model_cache:
+            return self._relaxed_model_cache[collection]
+        try:
+            models = await self.mrkt.gift_trait_options("models", [collection])
+        except Exception:
+            self._relaxed_model_cache[collection] = []
+            return []
+        floor_threshold = max(5, self.mrkt.settings.mrkt_min_model_floor * 0.6)
+        rarity_threshold = self.mrkt.settings.mrkt_max_model_rarity + 1
+        ranked: list[tuple[float, float, str]] = []
+        for item in models:
+            name = item.get("modelTitle") or item.get("modelName")
+            if not name:
+                continue
+            floor = self._nano_price(item.get("floorPriceNanoTons")) or 0
+            rarity = self._rarity_value(item.get("rarityPerMille")) or 999
+            if floor >= floor_threshold or rarity <= rarity_threshold:
+                ranked.append((-floor, rarity, name))
+        ranked.sort(key=lambda row: (row[0], row[1], row[2]))
+        self._relaxed_model_cache[collection] = [name for _, _, name in ranked[:PRIORITY_MODEL_SCAN_LIMIT]]
+        return self._relaxed_model_cache[collection]
 
     def _priority_backdrop_names(self) -> list[str]:
         premium = {name.lower(): name for name in self.mrkt.settings.premium_backdrop_list}
@@ -329,18 +407,44 @@ class ResearchService:
         backdrop_rarity = listing.get("backdrop_rarity")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
             return False
-        if listing["price"] <= self.mrkt.settings.mrkt_max_price and self._has_color_harmony(
-            listing.get("model_name"),
-            listing.get("backdrop_name"),
-        ):
-            return True
         premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
         backdrop = str(listing.get("backdrop_name") or "").lower()
         has_premium_backdrop = backdrop in premium_backdrops
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
+        has_harmony = self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name"))
+        if listing["price"] <= self.mrkt.settings.mrkt_max_price and has_harmony and self._has_liquidity_signal(listing, relaxed=True):
+            return True
         return has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
+
+    def _is_relaxed_quality_listing(self, listing: dict) -> bool:
+        if not listing.get("image_url") or not listing.get("price"):
+            return False
+        if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
+            return False
+        if listing["price"] > self.mrkt.settings.mrkt_research_max_price:
+            return False
+        premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
+        backdrop = str(listing.get("backdrop_name") or "").lower()
+        has_visual_signal = backdrop in premium_backdrops or self._has_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+        )
+        return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True)
+
+    def _has_liquidity_signal(self, listing: dict, relaxed: bool = False) -> bool:
+        model_floor = listing.get("model_floor_price")
+        gift_floor = listing.get("floor_price")
+        model_rarity = listing.get("model_rarity")
+        backdrop_rarity = listing.get("backdrop_rarity")
+        model_floor_threshold = self.mrkt.settings.mrkt_min_model_floor if not relaxed else max(5, self.mrkt.settings.mrkt_min_model_floor * 0.6)
+        rarity_bonus = 0 if not relaxed else 1
+        has_model_floor = bool(model_floor and model_floor >= model_floor_threshold)
+        has_model_rarity = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity + rarity_bonus)
+        has_backdrop_rarity = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity + rarity_bonus)
+        has_floor_discount = bool(gift_floor and listing.get("price") and listing["price"] <= gift_floor * 0.95)
+        return has_model_floor or has_model_rarity or has_backdrop_rarity or has_floor_discount
 
     def _has_color_harmony(self, model_name: str | None, backdrop_name: str | None) -> bool:
         model_palette = self._palette_for_model(model_name)

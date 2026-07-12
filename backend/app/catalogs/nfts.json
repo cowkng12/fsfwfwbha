@@ -1,14 +1,14 @@
 [
-  {"id":"vice-cream","name":"Vice Cream","image":"","searchNames":["Vice Cream","Ice Cream"]},
-  {"id":"instant-ramen","name":"Instant Ramen","image":""},
-  {"id":"pool-float","name":"Pool Float","image":""},
-  {"id":"money-pot","name":"Money Pot","image":""},
-  {"id":"happy-browneyz","name":"Happy Browneyz","image":"","searchNames":["Happy Browneyz","Happy Brownie","Happy BrownieZ"]},
+  {"id":"vice-cream","name":"Vice Cream","image":"","searchNames":["Vice Cream","ViceCream","Ice Cream"]},
+  {"id":"instant-ramen","name":"Instant Ramen","image":"","searchNames":["Instant Ramen","InstantRamen"]},
+  {"id":"pool-float","name":"Pool Float","image":"","searchNames":["Pool Float","PoolFloat"]},
+  {"id":"money-pot","name":"Money Pot","image":"","searchNames":["Money Pot","MoneyPot"]},
+  {"id":"happy-browneyz","name":"Happy Browneyz","image":"","searchNames":["Happy Browneyz","Happy Brownie","Happy BrownieZ","Happy Browniez"]},
   {"id":"victory-medal","name":"Victory Medal","image":""},
-  {"id":"cookie-heart","name":"Cookie Heart","image":""},
-  {"id":"pretty-pose","name":"Pretty Pose","image":""},
-  {"id":"restless-jar","name":"Restless Jar","image":""},
+  {"id":"cookie-heart","name":"Cookie Heart","image":"","searchNames":["Cookie Heart","CookieHeart"]},
+  {"id":"pretty-pose","name":"Pretty Pose","image":"","searchNames":["Pretty Pose","PrettyPose"]},
+  {"id":"restless-jar","name":"Restless Jar","image":"","searchNames":["Restless Jar","RestlessJar"]},
   {"id":"snoop-dog","name":"Snoop Dog","image":"","searchNames":["Snoop Dog","Snoop Dogg"]},
-  {"id":"evil-eye","name":"Evil Eye","image":""},
-  {"id":"surge-boat","name":"Surge Boat","image":""}
+  {"id":"evil-eye","name":"Evil Eye","image":"","searchNames":["Evil Eye","EvilEye"]},
+  {"id":"surge-boat","name":"Surge Boat","image":"","searchNames":["Surge Boat","SurgeBoat"]}
 ]

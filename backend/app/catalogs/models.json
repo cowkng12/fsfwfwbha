@@ -13,5 +13,15 @@
   {"name":"Neo Matrix","image":"/assets/model/neo-matrix.svg","rarity":0.8,"floorPrice":75},
   {"name":"Spatial Grid","image":"/assets/model/spatial-grid.svg","rarity":0.8,"floorPrice":69},
   {"name":"Fireball","image":"/assets/model/fireball.svg","rarity":1.2,"floorPrice":49.99},
-  {"name":"Highway","image":"/assets/model/highway.svg","rarity":1.2,"floorPrice":41}
+  {"name":"Highway","image":"/assets/model/highway.svg","rarity":1.2,"floorPrice":41},
+  {"name":"Chrome","image":"/assets/model/chrome.svg","rarity":1.1,"floorPrice":24},
+  {"name":"Halo","image":"/assets/model/halo.svg","rarity":1.2,"floorPrice":21},
+  {"name":"Prism","image":"/assets/model/prism.svg","rarity":1.4,"floorPrice":18},
+  {"name":"Velvet","image":"/assets/model/velvet.svg","rarity":1.5,"floorPrice":16},
+  {"name":"Orbit","image":"/assets/model/orbit.svg","rarity":1.6,"floorPrice":14},
+  {"name":"Bloom","image":"/assets/model/bloom.svg","rarity":1.7,"floorPrice":12},
+  {"name":"Mosaic","image":"/assets/model/mosaic.svg","rarity":1.8,"floorPrice":11},
+  {"name":"Neon","image":"/assets/model/neon.svg","rarity":2,"floorPrice":10},
+  {"name":"Ribbon","image":"/assets/model/ribbon.svg","rarity":2.2,"floorPrice":9},
+  {"name":"Coral","image":"/assets/model/coral.svg","rarity":2.4,"floorPrice":8}
 ]

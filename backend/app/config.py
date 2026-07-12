@@ -26,7 +26,8 @@ class Settings(BaseSettings):
         "Hunter Green,Indigo Dye,Lavender,Magenta,Malachite,Midnight Blue,Mint Green,"
         "Mustard,Mystic Pearl,Neon Blue,Onyx Black,Orange,Pacific Green,Platinum,Pure Gold,"
         "Purple,Ruby,Sapphire,Satin Gold,Shamrock Green,Silver,Sky Blue,Steel Grey,Turquoise,"
-        "Violet,White"
+        "Violet,White,Coral,Rose Gold,Peach,Teal,Navy Blue,Olive,Bronze,Lilac,Sea Foam,"
+        "Cloud White,Sunset Orange"
     )
     research_interval_seconds: int = 180
     keepalive_interval_seconds: int = 240
