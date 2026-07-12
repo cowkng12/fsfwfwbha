@@ -8,6 +8,7 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+.env.bak.*
 *.sqlite3
 *.db
 .pytest_cache/
