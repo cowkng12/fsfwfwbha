@@ -74,7 +74,7 @@ function Set-EnvValue {
 function Test-TelegramStringSessionFormat {
     param([string]$Session)
 
-    return [bool]($Session -match '^1[A-Za-z0-9_-]{80,}$')
+    return [bool]($Session -match '^1[A-Za-z0-9+/=_-]{80,}$')
 }
 
 function New-TelegramStringSession {
