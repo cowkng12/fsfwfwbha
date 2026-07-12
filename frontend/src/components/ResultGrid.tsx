@@ -16,7 +16,7 @@ export function ResultGrid({ items, loading, error }: Props) {
   }
 
   if (!visible.length) {
-    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Нет листингов до 35 TON или MRKT токен не авторизован.'}</div>;
+    return <div className="empty">{loading ? 'Идет ресерч MRKT...' : 'Нет листингов до 10 TON или MRKT токен не авторизован.'}</div>;
   }
 
   return (

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
-from app.catalog import blocked_collection_model_pairs, collection_quality_rules
+from app.catalog import blocked_collection_model_pairs, collection_quality_rules, default_collection_names
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
@@ -128,6 +128,7 @@ class ListingRepository:
             max_price = min(max_price, filters.max_price)
         where.append("price <= ?")
         params.append(max_price)
+        self._append_catalog_collection_filter(where, params)
         self._append_blocked_model_filter(where, params)
         self._append_collection_quality_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
@@ -144,6 +145,7 @@ class ListingRepository:
 
     def find_recent(self, limit: int = 80) -> list[Listing]:
         params: list[str | float | int] = [get_settings().mrkt_max_price]
+        catalog_filter = self._catalog_collection_sql(params)
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
         with connect() as conn:
@@ -153,6 +155,7 @@ class ListingRepository:
                 WHERE image_url IS NOT NULL
                   AND price > 0
                   AND price <= ?
+                  {catalog_filter}
                   {blocked_filter}
                   {quality_filter}
                   AND NOT EXISTS (
@@ -163,6 +166,7 @@ class ListingRepository:
                 ORDER BY first_seen_at DESC, updated_at DESC, price ASC
                 LIMIT ?
                 """.format(
+                    catalog_filter=catalog_filter,
                     blocked_filter=blocked_filter,
                     quality_filter=quality_filter,
                 ),
@@ -176,6 +180,7 @@ class ListingRepository:
         if first_seen_after:
             first_seen_filter = "AND first_seen_at >= ?"
             params.append(first_seen_after)
+        catalog_filter = self._catalog_collection_sql(params)
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
         liquidity_filter = self._model_liquidity_sql(params)
@@ -188,6 +193,7 @@ class ListingRepository:
                   AND price > 0
                   AND price <= ?
                   {first_seen_filter}
+                  {catalog_filter}
                   {blocked_filter}
                   {quality_filter}
                   {liquidity_filter}
@@ -205,6 +211,7 @@ class ListingRepository:
                 LIMIT ?
                 """.format(
                     first_seen_filter=first_seen_filter,
+                    catalog_filter=catalog_filter,
                     blocked_filter=blocked_filter,
                     quality_filter=quality_filter,
                     liquidity_filter=liquidity_filter,
@@ -222,6 +229,19 @@ class ListingRepository:
         quality_filter = self._collection_quality_sql(params)
         if quality_filter:
             where.append(quality_filter.removeprefix("AND "))
+
+    def _append_catalog_collection_filter(self, where: list[str], params: list[str | float | int]) -> None:
+        catalog_filter = self._catalog_collection_sql(params)
+        if catalog_filter:
+            where.append(catalog_filter.removeprefix("AND "))
+
+    def _catalog_collection_sql(self, params: list[str | float | int]) -> str:
+        names = sorted({" ".join(name.strip().lower().split()) for name in default_collection_names() if name.strip()})
+        if not names:
+            return ""
+        placeholders = ",".join("?" for _ in names)
+        params.extend(names)
+        return f"AND LOWER(TRIM(COALESCE(collection_name, ''))) IN ({placeholders})"
 
     def _model_liquidity_sql(self, params: list[str | float | int]) -> str:
         days = get_settings().mrkt_model_sales_max_age_days

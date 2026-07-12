@@ -99,7 +99,7 @@ export function App() {
     <main className="app-shell">
       <section className="profile-card">
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row">Бюджет: до 35 TON</div>
+        <div className="budget-row">Бюджет: до 10 TON</div>
       </section>
 
       <div className="section-head">
