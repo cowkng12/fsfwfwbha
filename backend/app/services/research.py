@@ -211,6 +211,57 @@ class ResearchService:
                 self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
         return normalized
 
+    async def debug_candidate_quality(self, collection_names: list[str] | None = None, sample_size: int = 8) -> dict[str, Any]:
+        collections = collection_names or default_collection_names()
+        summary: dict[str, Any] = {
+            "settings": {
+                "mrkt_max_price": self.mrkt.settings.mrkt_max_price,
+                "mrkt_research_max_price": self.mrkt.settings.mrkt_research_max_price,
+                "mrkt_min_model_floor": self.mrkt.settings.mrkt_min_model_floor,
+                "mrkt_max_model_rarity": self.mrkt.settings.mrkt_max_model_rarity,
+                "mrkt_max_backdrop_rarity": self.mrkt.settings.mrkt_max_backdrop_rarity,
+            },
+            "total_candidates": 0,
+            "strict_pass": 0,
+            "relaxed_pass": 0,
+            "rejections": {},
+            "collections": [],
+            "accepted_examples": [],
+        }
+        rejection_counts: dict[str, int] = {}
+        for collection in collections:
+            item = {"collection": collection, "candidates": 0, "strict_pass": 0, "relaxed_pass": 0, "examples": []}
+            try:
+                gifts = await self.mrkt.saling([collection], count=sample_size, max_price=self.mrkt.settings.mrkt_research_max_price)
+                item["candidates"] = len(gifts)
+                summary["total_candidates"] += len(gifts)
+                for gift in gifts:
+                    listing = await self._normalize_gift(gift, collection)
+                    strict_pass = self._is_quality_listing(listing)
+                    relaxed_pass = self._is_relaxed_quality_listing(listing)
+                    item["strict_pass"] += int(strict_pass)
+                    item["relaxed_pass"] += int(relaxed_pass)
+                    summary["strict_pass"] += int(strict_pass)
+                    summary["relaxed_pass"] += int(relaxed_pass)
+                    if strict_pass or relaxed_pass:
+                        if len(summary["accepted_examples"]) < 10:
+                            summary["accepted_examples"].append(self._debug_listing_summary(listing))
+                    else:
+                        reasons = self._quality_rejection_reasons(listing)
+                        for reason in reasons:
+                            rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                    if len(item["examples"]) < 3:
+                        example = self._debug_listing_summary(listing)
+                        example["strict_pass"] = strict_pass
+                        example["relaxed_pass"] = relaxed_pass
+                        example["reasons"] = [] if strict_pass or relaxed_pass else self._quality_rejection_reasons(listing)
+                        item["examples"].append(example)
+            except Exception as exc:
+                item["error"] = str(exc)
+            summary["collections"].append(item)
+        summary["rejections"] = dict(sorted(rejection_counts.items(), key=lambda row: row[1], reverse=True))
+        return summary
+
     async def _relaxed_candidate_gifts(self, collection: str) -> list[dict[str, Any]]:
         max_price = self.mrkt.settings.mrkt_research_max_price
         gifts = await self.mrkt.saling([collection], max_price=max_price)
@@ -452,6 +503,58 @@ class ResearchService:
         if not model_palette or not backdrop_palette:
             return False
         return bool(model_palette & backdrop_palette)
+
+    def _quality_rejection_reasons(self, listing: dict) -> list[str]:
+        reasons: list[str] = []
+        if not listing.get("image_url"):
+            reasons.append("missing_image")
+        if not listing.get("price"):
+            reasons.append("missing_price")
+        if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
+            reasons.append("blocked_model")
+        if listing.get("price") and listing["price"] > self.mrkt.settings.mrkt_research_max_price:
+            reasons.append("over_research_price")
+        if has_collection_quality_rules(listing.get("collection_name")) and not has_collection_specific_quality(
+            listing.get("collection_name"),
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+        ):
+            reasons.append("collection_quality_rule")
+        gift_floor = listing.get("floor_price")
+        if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
+            reasons.append("gift_floor_too_low")
+        premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
+        backdrop = str(listing.get("backdrop_name") or "").lower()
+        has_premium_backdrop = backdrop in premium_backdrops
+        model_floor = listing.get("model_floor_price")
+        model_rarity = listing.get("model_rarity")
+        backdrop_rarity = listing.get("backdrop_rarity")
+        has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
+        has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
+        has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
+        has_harmony = self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name"))
+        has_liquidity = self._has_liquidity_signal(listing, relaxed=True)
+        if not has_harmony:
+            reasons.append("no_color_harmony")
+        if not has_liquidity:
+            reasons.append("no_liquidity_signal")
+        if not any([has_premium_backdrop, has_expensive_model, has_rare_model, has_rare_backdrop]):
+            reasons.append("no_premium_or_rare_trait")
+        return reasons or ["unknown"]
+
+    def _debug_listing_summary(self, listing: dict) -> dict[str, Any]:
+        return {
+            "collection": listing.get("collection_name"),
+            "number": listing.get("number"),
+            "price": listing.get("price"),
+            "model": listing.get("model_name"),
+            "backdrop": listing.get("backdrop_name"),
+            "model_floor": listing.get("model_floor_price"),
+            "model_rarity": listing.get("model_rarity"),
+            "backdrop_rarity": listing.get("backdrop_rarity"),
+            "harmony": self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name")),
+            "liquidity": self._has_liquidity_signal(listing, relaxed=True),
+        }
 
     async def _enrich_model_sales(self, listing: dict, client: TelegramClient | None) -> None:
         sales = await self._model_recent_sales(

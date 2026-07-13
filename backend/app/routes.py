@@ -393,6 +393,17 @@ def random_test_listing() -> Listing:
     )
 
 
+@router.get("/debug/research-quality")
+async def debug_research_quality(
+    secret: str | None = Query(default=None),
+    limit: int = Query(default=8, ge=1, le=20),
+    x_cron_secret: str | None = Header(default=None),
+    service: ResearchService = Depends(research_service),
+):
+    require_cron_secret(secret, x_cron_secret)
+    return await service.debug_candidate_quality(sample_size=limit)
+
+
 @router.post("/telegram/webhook")
 async def telegram_webhook(
     update: dict,
