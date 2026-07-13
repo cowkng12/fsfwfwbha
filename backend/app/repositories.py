@@ -183,7 +183,6 @@ class ListingRepository:
         catalog_filter = self._catalog_collection_sql(params)
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
-        liquidity_filter = self._model_liquidity_sql(params)
         with connect() as conn:
             rows = conn.execute(
                 """
@@ -196,7 +195,6 @@ class ListingRepository:
                   {catalog_filter}
                   {blocked_filter}
                   {quality_filter}
-                  {liquidity_filter}
                   AND NOT EXISTS (
                     SELECT 1 FROM notified_items
                     WHERE notified_items.source = listings.source
@@ -214,7 +212,6 @@ class ListingRepository:
                     catalog_filter=catalog_filter,
                     blocked_filter=blocked_filter,
                     quality_filter=quality_filter,
-                    liquidity_filter=liquidity_filter,
                 ),
                 (*params, limit),
             ).fetchall()

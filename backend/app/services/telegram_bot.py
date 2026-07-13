@@ -81,7 +81,7 @@ class TelegramBotService:
     async def send_not_whitelisted(self, chat_id: int) -> None:
         await self._post("sendMessage", {"chat_id": chat_id, "text": WHITELIST_DENIED_MESSAGE})
 
-    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 5, first_seen_after: str | None = None) -> int:
+    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 15, first_seen_after: str | None = None) -> int:
         if not self.settings.telegram_alert_chat_id:
             return 0
         sent = 0
