@@ -2,6 +2,8 @@ import asyncio
 import hashlib
 import hmac
 import json
+import random
+from datetime import datetime, timezone
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
@@ -16,7 +18,7 @@ from app.catalog import (
 )
 from app.config import get_settings
 from app.repositories import ListingRepository
-from app.schemas import FilterRequest, ResultsResponse
+from app.schemas import FilterRequest, Listing, ResultsResponse
 from app.services.research import DealAnalyzer, ResearchService
 from app.services.telegram_bot import TelegramBotService, WHITELIST_DENIED_MESSAGE
 
@@ -317,6 +319,78 @@ async def debug_mrkt(client=Depends(mrkt_client)):
     except Exception as exc:
         result.update({"token_ok": False, "error": str(exc)})
     return result
+
+
+@router.get("/debug/test-alert")
+@router.post("/debug/test-alert")
+async def debug_test_alert(
+    secret: str | None = Query(default=None),
+    x_cron_secret: str | None = Header(default=None),
+    service: TelegramBotService = Depends(telegram_bot_service),
+):
+    require_cron_secret(secret, x_cron_secret)
+    if not service.settings.telegram_bot_token:
+        raise HTTPException(status_code=503, detail="TELEGRAM_BOT_TOKEN is not configured")
+    if not service.settings.telegram_alert_chat_id:
+        raise HTTPException(status_code=503, detail="TELEGRAM_ALERT_CHAT_ID is not configured")
+
+    listing = random_test_listing()
+    await service.send_listing_alert(listing)
+    return {
+        "sent": True,
+        "collection_name": listing.collection_name,
+        "number": listing.number,
+        "price": listing.price,
+        "model_name": listing.model_name,
+        "backdrop_name": listing.backdrop_name,
+    }
+
+
+def random_test_listing() -> Listing:
+    now = datetime.now(timezone.utc).isoformat()
+    samples = [
+        ("Vice Cream", "Vanilla Brick", "Pacific Green", "Musical Note"),
+        ("Instant Ramen", "Chrome", "Silver", "Sparkle"),
+        ("Pool Float", "Orbit", "Azure Blue", "Wave"),
+        ("Money Pot", "Goldsmith", "Pure Gold", "Coin"),
+        ("Victory Medal", "Halo", "Gold", "Star"),
+        ("Restless Jar", "Prism", "Electric Indigo", "Lightning"),
+        ("Evil Eye", "Neo Matrix", "Onyx Black", "Eye"),
+    ]
+    collection, model, backdrop, symbol = random.choice(samples)
+    number = str(random.randint(100000, 999999))
+    price = round(random.uniform(2.2, 9.8), 2)
+    external_id = hashlib.sha1(f"test-alert:{collection}:{number}:{now}".encode()).hexdigest()
+    slug = "".join(part for part in collection.title() if part.isalnum())
+    return Listing(
+        source="test-alert",
+        external_id=external_id,
+        collection_name=collection,
+        name=f"{collection} #{number}",
+        number=number,
+        model_name=model,
+        backdrop_name=backdrop,
+        symbol_name=symbol,
+        image_url=f"https://nft.fragment.com/gift/{slug.lower()}-{number}.webp",
+        price=price,
+        floor_price=round(price * random.uniform(1.08, 1.4), 2),
+        model_floor_price=round(max(8, price * random.uniform(1.2, 2.8)), 2),
+        sales_count=random.randint(1, 12),
+        uses_count=random.randint(1000, 6000),
+        uses_total=random.randint(10000, 100000),
+        combo_listed_count=random.randint(1, 8),
+        combo_floor_price=round(price * random.uniform(1.05, 1.6), 2),
+        model_last_sale_at=now,
+        model_recent_sales=json.dumps(
+            [{"number": str(random.randint(100000, 999999)), "price": price, "platform": "TEST", "date": now}],
+            ensure_ascii=False,
+        ),
+        current_owner="@test_owner",
+        marketplace_url="https://t.me/mrkt/app",
+        telegram_url=f"https://t.me/nft/{slug}-{number}",
+        first_seen_at=now,
+        updated_at=now,
+    )
 
 
 @router.post("/telegram/webhook")
