@@ -346,6 +346,17 @@ async def debug_test_alert(
     }
 
 
+@router.post("/debug/reset-alert-state")
+@router.get("/debug/reset-alert-state")
+def debug_reset_alert_state(
+    secret: str | None = Query(default=None),
+    x_cron_secret: str | None = Header(default=None),
+    repo: ListingRepository = Depends(listing_repo),
+):
+    require_cron_secret(secret, x_cron_secret)
+    return {"reset": True, **repo.reset_alert_state()}
+
+
 def random_test_listing() -> Listing:
     now = datetime.now(timezone.utc).isoformat()
     samples = [

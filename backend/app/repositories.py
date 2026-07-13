@@ -336,6 +336,20 @@ class ListingRepository:
             conn.execute("DELETE FROM listings")
         return int(row["count"] if row else 0)
 
+    def reset_alert_state(self) -> dict[str, int]:
+        with connect() as conn:
+            listing_count = conn.execute("SELECT COUNT(*) AS count FROM listings").fetchone()
+            notified_count = conn.execute("SELECT COUNT(*) AS count FROM notified_items").fetchone()
+            hidden_count = conn.execute("SELECT COUNT(*) AS count FROM hidden_items").fetchone()
+            conn.execute("DELETE FROM listings")
+            conn.execute("DELETE FROM notified_items")
+            conn.execute("DELETE FROM hidden_items")
+        return {
+            "deleted_listings": int(listing_count["count"] if listing_count else 0),
+            "deleted_notified": int(notified_count["count"] if notified_count else 0),
+            "deleted_hidden": int(hidden_count["count"] if hidden_count else 0),
+        }
+
     def last_research_at(self) -> str | None:
         with connect() as conn:
             row = conn.execute("SELECT created_at FROM research_runs ORDER BY id DESC LIMIT 1").fetchone()
