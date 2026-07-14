@@ -1,8 +1,11 @@
 import httpx
 import json
 import logging
+from io import BytesIO
 from datetime import datetime, timezone
 from html import escape
+
+from PIL import Image, UnidentifiedImageError
 
 from app.config import Settings
 from app.repositories import ListingRepository
@@ -120,16 +123,36 @@ class TelegramBotService:
             buttons.append({"text": "MRKT", "url": listing.marketplace_url})
         payload = {
             "chat_id": self.settings.telegram_alert_chat_id,
-            "photo": listing.image_url,
             "caption": self._format_preview_caption(listing),
             "parse_mode": "HTML",
         }
         if buttons:
             payload["reply_markup"] = {"inline_keyboard": [buttons]}
         try:
-            await self._post("sendPhoto", payload)
+            image = await self._download_preview_image(listing.image_url)
+            if not image:
+                return
+            await self._post_file(
+                "sendPhoto",
+                data=payload,
+                files={"photo": ("preview.png", image, "image/png")},
+            )
         except Exception as exc:
             logger.warning("Telegram listing preview failed for %s: %s", listing.external_id, exc)
+
+    async def _download_preview_image(self, image_url: str) -> bytes | None:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(image_url, headers={"user-agent": "Mozilla/5.0"})
+            response.raise_for_status()
+        try:
+            image = Image.open(BytesIO(response.content))
+            image.thumbnail((1024, 1024))
+            output = BytesIO()
+            image.convert("RGBA").save(output, format="PNG")
+            return output.getvalue()
+        except UnidentifiedImageError:
+            logger.warning("Cannot decode listing preview image: %s", image_url)
+            return None
 
     def _format_preview_caption(self, listing: Listing) -> str:
         title = f"{listing.collection_name} #{listing.number}" if listing.number else listing.collection_name
@@ -290,6 +313,21 @@ class TelegramBotService:
         url = f"https://api.telegram.org/bot{self.settings.telegram_bot_token}/{method}"
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, json=payload)
+            if response.is_error:
+                logger.warning("Telegram API %s failed: %s", method, response.text)
+            response.raise_for_status()
+            return response.json()
+
+    async def _post_file(self, method: str, data: dict, files: dict) -> dict:
+        if not self.settings.telegram_bot_token:
+            return {}
+        url = f"https://api.telegram.org/bot{self.settings.telegram_bot_token}/{method}"
+        form_data = {
+            key: json.dumps(value) if isinstance(value, (dict, list)) else value
+            for key, value in data.items()
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(url, data=form_data, files=files)
             if response.is_error:
                 logger.warning("Telegram API %s failed: %s", method, response.text)
             response.raise_for_status()

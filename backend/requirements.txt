@@ -6,3 +6,4 @@ curl-cffi==0.7.4
 apscheduler==3.11.0
 telethon==1.44.0
 python-dotenv==1.0.1
+Pillow==10.4.0
