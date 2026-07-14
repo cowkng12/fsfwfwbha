@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from hashlib import sha1
@@ -390,6 +391,7 @@ class ResearchService:
         floor_price = self._price(gift, "floorPriceNanoTONsByCollection", "collectionFloor", "floorPrice") or await self._collection_floor(collection)
         model_floor_price = self._price(gift, "floorPriceNanoTONsByBackdropModel", "modelFloor", "backdropModelFloor") or await self._model_floor(collection, model_name)
         now = datetime.now(timezone.utc).isoformat()
+        telegram_url = self._telegram_url_from_gift(gift, number) or self._telegram_url(collection, number)
         return {
             "source": "mrkt",
             "external_id": external_id,
@@ -401,7 +403,7 @@ class ResearchService:
             "backdrop_name": backdrop_name,
             "backdrop_rarity": self._rarity_value(self._deep_pick(gift, "backdropRarityPerMille", "backdropRarity")),
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
-            "image_url": self._fragment_image_url(collection, number) or self._image_url(gift),
+            "image_url": self._fragment_image_url_from_url(telegram_url) or self._fragment_image_url(collection, number) or self._image_url(gift),
             "price": price or 0,
             "floor_price": floor_price,
             "model_floor_price": model_floor_price,
@@ -440,7 +442,7 @@ class ResearchService:
             "next_resale_at": self._deep_pick(gift, "nextResaleDate", "next_resale_at"),
             "next_transfer_at": self._deep_pick(gift, "nextTransferDate", "next_transfer_at"),
             "marketplace_url": self._marketplace_url(gift),
-            "telegram_url": self._telegram_url(collection, number),
+            "telegram_url": telegram_url,
             "first_seen_at": now,
             "updated_at": now,
         }
@@ -598,7 +600,7 @@ class ResearchService:
         for gift in gifts:
             number = str(self._deep_pick(gift, "number", "giftNumber", "num", "gift_num", "giftNum") or "") or None
             gift_collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or collection
-            url = self._telegram_url(gift_collection, number)
+            url = self._telegram_url_from_gift(gift, number) or self._telegram_url(gift_collection, number)
             slug = self._telegram_slug(url)
             if not number or not slug or slug in seen:
                 continue
@@ -871,6 +873,57 @@ class ResearchService:
             return None
         slug = "".join(part for part in collection.title() if part.isalnum())
         return f"https://t.me/nft/{slug}-{number}"
+
+    def _telegram_url_from_gift(self, data: Any, number: str | None = None) -> str | None:
+        raw = self._find_telegram_nft_url(data)
+        if not raw:
+            slug = self._find_telegram_nft_slug(data, number)
+            return f"https://t.me/nft/{slug}" if slug else None
+        match = re.search(r"(?:https?://)?(?:t\.me|telegram\.me)/nft/([A-Za-z0-9_-]+)", raw)
+        return f"https://t.me/nft/{match.group(1)}" if match else None
+
+    def _find_telegram_nft_url(self, data: Any) -> str | None:
+        if isinstance(data, str):
+            match = re.search(r"(?:https?://)?(?:t\.me|telegram\.me)/nft/[A-Za-z0-9_-]+", data)
+            return match.group(0) if match else None
+        if isinstance(data, dict):
+            for value in data.values():
+                found = self._find_telegram_nft_url(value)
+                if found:
+                    return found
+        if isinstance(data, list):
+            for item in data:
+                found = self._find_telegram_nft_url(item)
+                if found:
+                    return found
+        return None
+
+    def _find_telegram_nft_slug(self, data: Any, number: str | None = None) -> str | None:
+        expected_suffix = f"-{number}" if number else None
+        if isinstance(data, str):
+            match = re.fullmatch(r"[A-Za-z][A-Za-z0-9]*-\d+", data.strip())
+            if match and (not expected_suffix or match.group(0).endswith(expected_suffix)):
+                return match.group(0)
+            return None
+        if isinstance(data, dict):
+            for key in ("name", "slug", "giftSlug", "nftSlug", "telegramSlug"):
+                found = self._find_telegram_nft_slug(data.get(key), number)
+                if found:
+                    return found
+            for value in data.values():
+                found = self._find_telegram_nft_slug(value, number)
+                if found:
+                    return found
+        if isinstance(data, list):
+            for item in data:
+                found = self._find_telegram_nft_slug(item, number)
+                if found:
+                    return found
+        return None
+
+    def _fragment_image_url_from_url(self, telegram_url: str | None) -> str | None:
+        slug = self._telegram_slug(telegram_url)
+        return f"https://nft.fragment.com/gift/{slug.lower()}.webp" if slug else None
 
     def _fragment_image_url(self, collection: str, number: str | None) -> str | None:
         if not collection or not number:
