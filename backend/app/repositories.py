@@ -367,28 +367,28 @@ SUBSCRIPTION_PLANS = {
         "id": "day",
         "title": "1 день",
         "description": "Пробный доступ к алертам бота на сутки.",
-        "stars": 15,
+        "stars": 49,
         "duration_days": 1,
     },
     "week": {
         "id": "week",
         "title": "1 неделя",
         "description": "Недорогой доступ к алертам на неделю.",
-        "stars": 69,
+        "stars": 199,
         "duration_days": 7,
     },
     "month": {
         "id": "month",
         "title": "1 месяц",
         "description": "Самый удобный тариф для постоянного поиска.",
-        "stars": 199,
+        "stars": 599,
         "duration_days": 30,
     },
     "forever": {
         "id": "forever",
         "title": "Навсегда",
         "description": "Разовая покупка без продления.",
-        "stars": 999,
+        "stars": 2499,
         "duration_days": None,
     },
 }
@@ -403,6 +403,16 @@ class SubscriptionRepository:
 
     def get(self, user_id: int | str) -> dict:
         now = utc_now()
+        if self.is_owner(user_id):
+            return {
+                "active": True,
+                "plan_id": "owner",
+                "status": "owner",
+                "started_at": None,
+                "expires_at": None,
+                "updated_at": None,
+                "plans": self.plans(),
+            }
         with connect() as conn:
             row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
         if not row:
@@ -420,6 +430,29 @@ class SubscriptionRepository:
         data["active"] = active
         data["plans"] = self.plans()
         return data
+
+    def is_owner(self, user_id: int | str) -> bool:
+        settings = get_settings()
+        owner_ids = settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set
+        return int(user_id) in owner_ids if str(user_id).isdigit() else False
+
+    def active_recipient_ids(self) -> list[str]:
+        settings = get_settings()
+        recipients = {str(item) for item in (settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set)}
+        if settings.telegram_alert_chat_id:
+            recipients.add(str(settings.telegram_alert_chat_id))
+        now = utc_now()
+        with connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT user_id FROM subscriptions
+                WHERE status = 'active'
+                  AND (expires_at IS NULL OR expires_at > ?)
+                """,
+                (now,),
+            ).fetchall()
+        recipients.update(str(row["user_id"]) for row in rows)
+        return sorted(recipients)
 
     def activate(
         self,

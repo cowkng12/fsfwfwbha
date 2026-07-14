@@ -28,10 +28,10 @@ button { border: 0; cursor: pointer; }
 .budget-row { margin-top: 16px; text-align: center; color: #dbeafe; font-size: 18px; font-weight: 900; }
 .subscription-button { width: 100%; min-height: 50px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-radius: 12px; background: #1e2f44; border: 1px solid #315f9b; color: #fff; font-size: 17px; font-weight: 900; }
 .subscription-button span { color: #8bbcff; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
-.section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 28px; }
-.section-title { display: inline-grid; place-items: center; min-width: 130px; height: 56px; padding: 0 24px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 21px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
-.picker-button { min-width: 168px; height: 56px; padding: 0 18px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 18px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
-.clear-button { height: 44px; padding: 0 16px; border-radius: 12px; background: #2b2c2b; border: 1px solid #484a48; color: #f3f4f6; font-weight: 850; }
+.section-head { display: grid; grid-template-columns: minmax(100px, .85fr) minmax(150px, 1.35fr) minmax(92px, .8fr); align-items: center; gap: 10px; margin: 0 0 28px; }
+.section-title { display: grid; place-items: center; min-width: 0; height: 54px; padding: 0 12px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 20px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-button { min-width: 0; width: 100%; height: 54px; padding: 0 12px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 17px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clear-button { width: 100%; height: 46px; padding: 0 12px; border-radius: 12px; background: #2b2c2b; border: 1px solid #484a48; color: #f3f4f6; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .nft-card { min-width: 0; overflow: hidden; border-radius: 16px; background: #2b2c2b; border: 1px solid #343635; box-shadow: 0 14px 28px #0004; }
 .nft-card.is-new { border-color: #3b91ff; box-shadow: 0 0 0 1px #3b91ff, 0 0 24px #3b91ff33; }
@@ -117,8 +117,8 @@ mark { background: #ffde17; color: #050505; border-radius: 999px; padding: 1px 6
 
 @media (max-width: 380px) {
   .grid { gap: 10px; }
-  .section-title, .picker-button { width: 100%; }
-  .clear-button { width: 100%; }
+  .section-head { grid-template-columns: 1fr 1fr; }
+  .picker-button { grid-column: 1 / -1; }
   .nft-card h2 { font-size: 15px; }
   .card-body { padding: 12px 10px 13px; }
   .trait-line { font-size: 13px; }

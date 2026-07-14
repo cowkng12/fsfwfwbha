@@ -76,11 +76,14 @@ def require_allowed_telegram_user(x_telegram_init_data: str | None = Header(defa
 def require_telegram_user_id(x_telegram_init_data: str | None = Header(default=None)) -> int:
     settings = get_settings()
     user_id = telegram_init_data_user_id(x_telegram_init_data, settings.telegram_bot_token)
-    allowed_user_ids = settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set
-    if allowed_user_ids and user_id not in allowed_user_ids:
-        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
     if user_id is None:
         raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    return user_id
+
+
+def require_active_subscription(user_id: int = Depends(require_telegram_user_id)) -> int:
+    if not SubscriptionRepository().get(user_id)["active"]:
+        raise HTTPException(status_code=402, detail="Subscription required")
     return user_id
 
 
@@ -109,14 +112,14 @@ def health():
 
 
 @router.get("/catalog")
-def catalog(_: None = Depends(require_allowed_telegram_user)):
+def catalog(_: int = Depends(require_telegram_user_id)):
     return get_catalog()
 
 
 @router.get("/catalog/traits")
 async def catalog_traits(
     collectionName: str = Query(..., min_length=1),
-    _: None = Depends(require_allowed_telegram_user),
+    _: int = Depends(require_telegram_user_id),
     client=Depends(mrkt_client),
 ):
     collection_names = collection_search_names(collectionName)
@@ -226,9 +229,11 @@ def results(
     minPrice: float | None = Query(default=None, ge=0),
     maxPrice: float | None = Query(default=None, ge=0),
     limit: int = Query(default=60, ge=1, le=200),
-    _: None = Depends(require_allowed_telegram_user),
+    user_id: int = Depends(require_telegram_user_id),
     repo: ListingRepository = Depends(listing_repo),
 ):
+    if not SubscriptionRepository().get(user_id)["active"]:
+        return ResultsResponse(items=[], last_research_at=repo.last_research_at())
     collection_names = parse_multi(collectionNames)
     backdrop_names = parse_multi(backdropNames)
     model_names = parse_multi(modelNames)
@@ -315,7 +320,7 @@ async def cron_research(
 @router.post("/listings/clear")
 def clear_listings(
     confirm: bool = Query(default=False),
-    _: None = Depends(require_allowed_telegram_user),
+    _: int = Depends(require_active_subscription),
     repo: ListingRepository = Depends(listing_repo),
 ):
     if not confirm:

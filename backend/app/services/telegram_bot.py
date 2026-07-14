@@ -146,22 +146,27 @@ class TelegramBotService:
         await self._post("sendMessage", {"chat_id": chat_id, "text": WHITELIST_DENIED_MESSAGE})
 
     async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 15, first_seen_after: str | None = None) -> int:
-        if not self.settings.telegram_alert_chat_id:
+        recipients = SubscriptionRepository().active_recipient_ids()
+        if not recipients:
             return 0
         sent = 0
         for listing in repo.find_unnotified(limit, first_seen_after=first_seen_after):
+            delivered = False
             try:
-                await self.send_listing_alert(listing)
-                repo.mark_notified(listing.source, listing.external_id)
-                sent += 1
+                for chat_id in recipients:
+                    await self.send_listing_alert(listing, chat_id=chat_id)
+                    delivered = True
+                if delivered:
+                    repo.mark_notified(listing.source, listing.external_id)
+                    sent += 1
             except Exception as exc:
                 logger.warning("Telegram listing alert failed for %s: %s", listing.external_id, exc)
         return sent
 
-    async def send_listing_alert(self, listing: Listing) -> None:
+    async def send_listing_alert(self, listing: Listing, chat_id: str | int | None = None) -> None:
         text = self._format_listing_alert(listing)
         payload = {
-            "chat_id": self.settings.telegram_alert_chat_id,
+            "chat_id": chat_id or self.settings.telegram_alert_chat_id,
             "text": text,
             "parse_mode": "HTML",
         }
@@ -172,9 +177,9 @@ class TelegramBotService:
         if listing.marketplace_url:
             payload["reply_markup"] = {"inline_keyboard": [[{"text": "Открыть лот", "url": listing.marketplace_url}]]}
         await self._post("sendMessage", payload)
-        await self._send_listing_preview(listing)
+        await self._send_listing_preview(listing, chat_id=chat_id)
 
-    async def _send_listing_preview(self, listing: Listing) -> None:
+    async def _send_listing_preview(self, listing: Listing, chat_id: str | int | None = None) -> None:
         if not listing.image_url:
             return
         buttons: list[dict[str, str]] = []
@@ -183,7 +188,7 @@ class TelegramBotService:
         if listing.marketplace_url:
             buttons.append({"text": "MRKT", "url": listing.marketplace_url})
         payload = {
-            "chat_id": self.settings.telegram_alert_chat_id,
+            "chat_id": chat_id or self.settings.telegram_alert_chat_id,
             "caption": self._format_preview_caption(listing),
             "parse_mode": "HTML",
         }

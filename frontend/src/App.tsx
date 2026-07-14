@@ -218,6 +218,7 @@ function SubscriptionSheet({
 function subscriptionStatusText(status: SubscriptionStatus | null, plan?: SubscriptionPlan) {
   if (!status) return 'Загружаем данные';
   if (!status.active) return 'Выбери тариф ниже';
+  if (status.status === 'owner') return 'Владелец · навсегда';
   if (!status.expires_at) return `${plan?.title ?? 'Доступ'} · навсегда`;
   return `${plan?.title ?? 'Доступ'} · до ${new Date(status.expires_at).toLocaleDateString()}`;
 }
