@@ -103,14 +103,40 @@ class TelegramBotService:
         }
         if listing.telegram_url:
             payload["link_preview_options"] = {
-                "is_disabled": False,
-                "url": listing.telegram_url,
-                "prefer_large_media": True,
-                "show_above_text": False,
+                "is_disabled": True,
             }
         if listing.marketplace_url:
             payload["reply_markup"] = {"inline_keyboard": [[{"text": "Открыть лот", "url": listing.marketplace_url}]]}
         await self._post("sendMessage", payload)
+        await self._send_listing_preview(listing)
+
+    async def _send_listing_preview(self, listing: Listing) -> None:
+        if not listing.image_url:
+            return
+        buttons: list[dict[str, str]] = []
+        if listing.telegram_url:
+            buttons.append({"text": "Telegram", "url": listing.telegram_url})
+        if listing.marketplace_url:
+            buttons.append({"text": "MRKT", "url": listing.marketplace_url})
+        payload = {
+            "chat_id": self.settings.telegram_alert_chat_id,
+            "photo": listing.image_url,
+            "caption": self._format_preview_caption(listing),
+            "parse_mode": "HTML",
+        }
+        if buttons:
+            payload["reply_markup"] = {"inline_keyboard": [buttons]}
+        try:
+            await self._post("sendPhoto", payload)
+        except Exception as exc:
+            logger.warning("Telegram listing preview failed for %s: %s", listing.external_id, exc)
+
+    def _format_preview_caption(self, listing: Listing) -> str:
+        title = f"{listing.collection_name} #{listing.number}" if listing.number else listing.collection_name
+        return "\n".join([
+            "<b>Telegram preview</b>",
+            escape(title),
+        ])
 
     def _format_listing_alert(self, listing: Listing) -> str:
         title = f"{listing.collection_name} #{listing.number}" if listing.number else listing.collection_name
