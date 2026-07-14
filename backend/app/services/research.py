@@ -27,8 +27,12 @@ PRIORITY_MODEL_SCAN_LIMIT = 96
 PRIORITY_BACKDROP_SCAN_LIMIT = 120
 PRIORITY_FILTER_BATCH_SIZE = 4
 PRIORITY_FILTER_RESULT_COUNT = 20
-MODEL_SALE_SAMPLE_SIZE = 16
-MODEL_RECENT_SALES_LIMIT = 5
+RAW_CANDIDATE_SCAN_LIMIT = 40
+ACCEPTED_LISTINGS_PER_COLLECTION = 3
+MAX_LISTINGS_PER_RUN = 25
+MODEL_SALE_SAMPLE_SIZE = 6
+MODEL_RECENT_SALES_LIMIT = 3
+COMBO_MARKET_MAX_PAGES = 3
 # Keep the most visually strong and color-harmony-friendly backdrops first.
 PRIORITY_BACKDROP_ORDER = [
     "Onyx Black",
@@ -165,8 +169,11 @@ class ResearchService:
             telegram_client = await self._telegram_client()
             try:
                 for name in collections:
+                    if len(normalized) >= MAX_LISTINGS_PER_RUN:
+                        break
                     try:
                         gifts = await self._candidate_gifts(name)
+                        accepted_for_collection = 0
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
@@ -175,6 +182,9 @@ class ResearchService:
                                 await self._enrich_public_metadata(listing)
                                 await self._enrich_unique_gift_metadata(listing, telegram_client)
                                 normalized.append(listing)
+                                accepted_for_collection += 1
+                                if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
+                                    break
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
                 if not normalized:
@@ -199,13 +209,16 @@ class ResearchService:
             if backdrop_names:
                 gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
 
-        return self._dedupe_gifts(gifts)
+        return self._limit_candidate_gifts(self._dedupe_gifts(gifts), RAW_CANDIDATE_SCAN_LIMIT)
 
     async def _relaxed_listings(self, collections: list[str], telegram_client: TelegramClient | None) -> list[dict]:
         normalized: list[dict] = []
         for name in collections:
+            if len(normalized) >= MAX_LISTINGS_PER_RUN:
+                break
             try:
                 gifts = await self._relaxed_candidate_gifts(name)
+                accepted_for_collection = 0
                 for gift in gifts:
                     listing = await self._normalize_gift(gift, name)
                     if self._is_relaxed_quality_listing(listing):
@@ -214,6 +227,9 @@ class ResearchService:
                         await self._enrich_public_metadata(listing)
                         await self._enrich_unique_gift_metadata(listing, telegram_client)
                         normalized.append(listing)
+                        accepted_for_collection += 1
+                        if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
+                            break
             except Exception as exc:
                 self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
         return normalized
@@ -281,7 +297,7 @@ class ResearchService:
         if backdrop_names:
             gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
 
-        return self._dedupe_gifts(gifts)
+        return self._limit_candidate_gifts(self._dedupe_gifts(gifts), RAW_CANDIDATE_SCAN_LIMIT)
 
     async def _priority_model_names(self, collection: str) -> list[str]:
         if collection in self._priority_model_cache:
@@ -376,6 +392,10 @@ class ResearchService:
         for gift in gifts:
             unique.setdefault(self._gift_key(gift), gift)
         return list(unique.values())
+
+    def _limit_candidate_gifts(self, gifts: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+        ranked = sorted(gifts, key=lambda gift: self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice") or 999999)
+        return ranked[:limit]
 
     def _gift_key(self, gift: dict[str, Any]) -> str:
         key = self._pick(gift, "id", "giftIdString", "giftId", "slug")
@@ -648,7 +668,9 @@ class ResearchService:
         cursor = ""
         seen_cursors: set[str] = set()
         try:
-            while True:
+            pages = 0
+            while pages < COMBO_MARKET_MAX_PAGES:
+                pages += 1
                 page = await self.mrkt.saling_page(
                     [collection],
                     model_names=[model],
