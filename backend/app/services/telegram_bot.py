@@ -33,7 +33,10 @@ class TelegramBotService:
         if self.settings.telegram_webhook_secret:
             payload["secret_token"] = self.settings.telegram_webhook_secret
         try:
-            await self._post("setMyCommands", {"commands": [{"command": "start", "description": "Открыть Mini App"}]})
+            await self._post("setMyCommands", {"commands": [
+                {"command": "start", "description": "Открыть Mini App"},
+                {"command": "subscribe", "description": "Купить подписку"},
+            ]})
             await self._post("setChatMenuButton", {"menu_button": {"type": "web_app", "text": "Mini App", "web_app": {"url": self.settings.public_base_url.rstrip("/")}}})
             return await self._post("setWebhook", payload)
         except Exception as exc:
@@ -61,6 +64,9 @@ class TelegramBotService:
         if not self._is_allowed(chat_id, user_id):
             logger.info("Ignoring Telegram update from non-whitelisted chat=%s user=%s", chat_id, user_id)
             await self.send_not_whitelisted(chat_id)
+            return
+        if text.startswith("/subscribe"):
+            await self.send_subscribe(chat_id)
             return
         if text.startswith("/start"):
             await self.send_start(chat_id)
@@ -138,6 +144,21 @@ class TelegramBotService:
             "parse_mode": "HTML",
             "reply_markup": {
                 "inline_keyboard": [[{"text": "Открыть Mini App", "web_app": {"url": app_url}}]]
+            },
+        }
+        await self._post("sendMessage", payload)
+
+    async def send_subscribe(self, chat_id: int) -> None:
+        app_url = (self.settings.public_base_url or "").rstrip("/")
+        payload = {
+            "chat_id": chat_id,
+            "text": (
+                "<b>Подписка PRIVATE FLIP</b>\n\n"
+                "Чтобы получить подписку, перейдите в приложение и откройте раздел <b>Моя подписка</b>."
+            ),
+            "parse_mode": "HTML",
+            "reply_markup": {
+                "inline_keyboard": [[{"text": "Перейти в приложение", "web_app": {"url": app_url}}]]
             },
         }
         await self._post("sendMessage", payload)
