@@ -1,4 +1,4 @@
-import type { Catalog, FilterState, GiftTraitCatalog, Listing } from './types';
+import type { Catalog, FilterState, GiftTraitCatalog, Listing, SubscriptionPlan, SubscriptionStatus } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 export const ACCESS_DENIED_MESSAGE = 'Вы не внесены в белый список бота.';
@@ -67,5 +67,19 @@ export async function fetchResults(filters: FilterState = emptyFilters): Promise
 
 export async function clearListings(): Promise<{ deleted: number; archived: boolean }> {
   const response = await apiFetch('/api/listings/clear?confirm=true', 'Cannot clear listings', { method: 'POST' });
+  return response.json();
+}
+
+export async function fetchSubscription(): Promise<SubscriptionStatus> {
+  const response = await apiFetch('/api/subscription', 'Cannot load subscription');
+  return response.json();
+}
+
+export async function createSubscriptionInvoice(planId: string): Promise<{ invoice_link: string; plan: SubscriptionPlan }> {
+  const response = await apiFetch('/api/subscription/invoice', 'Cannot create invoice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan_id: planId }),
+  });
   return response.json();
 }

@@ -98,6 +98,27 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 PRIMARY KEY (source, external_id)
             );
+
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                user_id TEXT PRIMARY KEY,
+                plan_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                expires_at TEXT,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS subscription_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                plan_id TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                currency TEXT NOT NULL,
+                total_amount INTEGER NOT NULL,
+                telegram_payment_charge_id TEXT,
+                provider_payment_charge_id TEXT,
+                created_at TEXT NOT NULL
+            );
             """
         )
         for statement in [

@@ -8,7 +8,7 @@ from html import escape
 from PIL import Image, UnidentifiedImageError
 
 from app.config import Settings
-from app.repositories import ListingRepository
+from app.repositories import ListingRepository, SubscriptionRepository
 from app.schemas import Listing
 
 logger = logging.getLogger(__name__)
@@ -41,8 +41,16 @@ class TelegramBotService:
             return {"ok": False, "description": str(exc)}
 
     async def handle_update(self, update: dict) -> None:
+        pre_checkout = update.get("pre_checkout_query")
+        if pre_checkout:
+            await self.answer_pre_checkout(pre_checkout)
+            return
         message = update.get("message") or update.get("edited_message")
         if not message:
+            return
+        successful_payment = message.get("successful_payment")
+        if successful_payment:
+            await self.handle_successful_payment(message, successful_payment)
             return
         text = (message.get("text") or "").strip()
         chat = message.get("chat") or {}
@@ -56,6 +64,59 @@ class TelegramBotService:
             return
         if text.startswith("/start"):
             await self.send_start(chat_id)
+
+    async def create_subscription_invoice(self, user_id: int, plan: dict) -> str:
+        payload = f"subscription:{user_id}:{plan['id']}:{int(datetime.now(timezone.utc).timestamp())}"
+        response = await self._post(
+            "createInvoiceLink",
+            {
+                "title": f"PRIVATE FLIP - {plan['title']}",
+                "description": plan["description"],
+                "payload": payload,
+                "provider_token": "",
+                "currency": "XTR",
+                "prices": [{"label": plan["title"], "amount": plan["stars"]}],
+            },
+        )
+        result = response.get("result")
+        if not result:
+            raise RuntimeError("Telegram did not return invoice link")
+        return str(result)
+
+    async def answer_pre_checkout(self, pre_checkout: dict) -> None:
+        await self._post("answerPreCheckoutQuery", {"pre_checkout_query_id": pre_checkout.get("id"), "ok": True})
+
+    async def handle_successful_payment(self, message: dict, payment: dict) -> None:
+        payload = payment.get("invoice_payload") or ""
+        parts = payload.split(":")
+        if len(parts) < 4 or parts[0] != "subscription":
+            return
+        user_id = parts[1]
+        plan_id = parts[2]
+        status = SubscriptionRepository().activate(
+            user_id=user_id,
+            plan_id=plan_id,
+            payload=payload,
+            currency=payment.get("currency") or "",
+            total_amount=int(payment.get("total_amount") or 0),
+            telegram_payment_charge_id=payment.get("telegram_payment_charge_id"),
+            provider_payment_charge_id=payment.get("provider_payment_charge_id"),
+        )
+        chat_id = (message.get("chat") or {}).get("id")
+        if chat_id:
+            await self.send_subscription_receipt(chat_id, status)
+
+    async def send_subscription_receipt(self, chat_id: int, status: dict) -> None:
+        expires_at = status.get("expires_at")
+        expires_text = "навсегда" if not expires_at else self._format_date(expires_at)
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": f"<b>Подписка активирована</b>\nДоступ: <b>{escape(expires_text)}</b>",
+                "parse_mode": "HTML",
+            },
+        )
 
     def _is_allowed(self, chat_id: int, user_id: int | None) -> bool:
         allowed_chats = self.settings.telegram_allowed_chat_id_set

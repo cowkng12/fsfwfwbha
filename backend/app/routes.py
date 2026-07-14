@@ -17,8 +17,15 @@ from app.catalog import (
     is_priority_collection_model,
 )
 from app.config import get_settings
-from app.repositories import ListingRepository
-from app.schemas import FilterRequest, Listing, ResultsResponse
+from app.repositories import ListingRepository, SubscriptionRepository
+from app.schemas import (
+    FilterRequest,
+    Listing,
+    ResultsResponse,
+    SubscriptionInvoiceRequest,
+    SubscriptionInvoiceResponse,
+    SubscriptionStatus,
+)
 from app.services.research import DealAnalyzer, ResearchService
 from app.services.telegram_bot import TelegramBotService, WHITELIST_DENIED_MESSAGE
 
@@ -64,6 +71,17 @@ def require_allowed_telegram_user(x_telegram_init_data: str | None = Header(defa
     user_id = telegram_init_data_user_id(x_telegram_init_data, settings.telegram_bot_token)
     if user_id not in allowed_user_ids:
         raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+
+
+def require_telegram_user_id(x_telegram_init_data: str | None = Header(default=None)) -> int:
+    settings = get_settings()
+    user_id = telegram_init_data_user_id(x_telegram_init_data, settings.telegram_bot_token)
+    allowed_user_ids = settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set
+    if allowed_user_ids and user_id not in allowed_user_ids:
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    if user_id is None:
+        raise HTTPException(status_code=403, detail=WHITELIST_DENIED_MESSAGE)
+    return user_id
 
 
 def telegram_init_data_user_id(init_data: str | None, bot_token: str | None) -> int | None:
@@ -240,6 +258,27 @@ def results(
     except Exception:
         last_research_at = None
     return ResultsResponse(items=items, last_research_at=last_research_at)
+
+
+@router.get("/subscription", response_model=SubscriptionStatus)
+def subscription_status(user_id: int = Depends(require_telegram_user_id)):
+    return SubscriptionRepository().get(user_id)
+
+
+@router.post("/subscription/invoice", response_model=SubscriptionInvoiceResponse)
+async def subscription_invoice(
+    request: SubscriptionInvoiceRequest,
+    user_id: int = Depends(require_telegram_user_id),
+    service: TelegramBotService = Depends(telegram_bot_service),
+):
+    repo = SubscriptionRepository()
+    plan = repo.plan(request.plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Unknown subscription plan")
+    if not service.settings.telegram_bot_token:
+        raise HTTPException(status_code=503, detail="TELEGRAM_BOT_TOKEN is not configured")
+    invoice_link = await service.create_subscription_invoice(user_id, plan)
+    return {"invoice_link": invoice_link, "plan": plan}
 
 
 @router.post("/research/run")

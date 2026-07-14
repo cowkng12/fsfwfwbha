@@ -26,6 +26,8 @@ button { border: 0; cursor: pointer; }
 .meter-row i { z-index: 1; }
 .meter-row.muted i { min-width: 0; width: 0; box-shadow: none; }
 .budget-row { margin-top: 16px; text-align: center; color: #dbeafe; font-size: 18px; font-weight: 900; }
+.subscription-button { width: 100%; min-height: 50px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-radius: 12px; background: #1e2f44; border: 1px solid #315f9b; color: #fff; font-size: 17px; font-weight: 900; }
+.subscription-button span { color: #8bbcff; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 28px; }
 .section-title { display: inline-grid; place-items: center; min-width: 130px; height: 56px; padding: 0 24px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 21px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
 .picker-button { min-width: 168px; height: 56px; padding: 0 18px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 18px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; }
@@ -97,6 +99,21 @@ mark { background: #ffde17; color: #050505; border-radius: 999px; padding: 1px 6
 .picker-check input { width: 28px; height: 28px; margin: 0; accent-color: #4287f5; }
 .picker-actions { position: sticky; bottom: -22px; display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 14px 0 0; background: linear-gradient(180deg, transparent, #2b282c 28%); }
 .picker-actions button { height: 44px; border-radius: 10px; font-weight: 900; }
+
+.subscription-sheet { position: fixed; inset: 0; z-index: 35; display: flex; align-items: flex-end; justify-content: center; background: #0009; }
+.subscription-panel { position: relative; width: min(100%, 520px); max-height: min(86vh, 720px); overflow-y: auto; padding: 24px 20px 22px; border-radius: 26px 26px 0 0; background: #171b1f; border: 1px solid #334155; box-shadow: 0 -18px 60px #000c; }
+.subscription-panel h2 { margin: 0 0 16px; font-size: 25px; line-height: 1.05; }
+.subscription-status { display: grid; gap: 5px; padding: 14px 16px; border-radius: 12px; background: #2b2c2b; border: 1px solid #484a48; color: #d1d5db; }
+.subscription-status.active { background: #173225; border-color: #2f8f5b; color: #d7ffe9; }
+.subscription-status b { color: #fff; font-size: 19px; }
+.subscription-status span { font-size: 14px; }
+.plan-list { display: grid; gap: 10px; margin-top: 16px; }
+.plan-item { min-height: 76px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 13px 14px; border-radius: 12px; background: #243142; border: 1px solid #38516e; color: #fff; text-align: left; }
+.plan-item:disabled { opacity: .72; cursor: wait; }
+.plan-item b { display: block; margin-bottom: 4px; font-size: 18px; }
+.plan-item small { display: block; color: #cbd5e1; font-size: 13px; line-height: 1.25; }
+.plan-item strong { min-width: 72px; color: #ffd51b; font-size: 18px; text-align: right; white-space: nowrap; }
+.subscription-error { margin-top: 14px; padding: 12px; border-radius: 10px; background: #3b1d24; border: 1px solid #8f3448; color: #ffdbe3; font-weight: 800; }
 
 @media (max-width: 380px) {
   .grid { gap: 10px; }

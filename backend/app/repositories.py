@@ -360,3 +360,124 @@ class ResearchRunRepository:
                 "INSERT INTO research_runs (source, status, message, created_at) VALUES (?, ?, ?, ?)",
                 (source, status, message, utc_now()),
             )
+
+
+SUBSCRIPTION_PLANS = {
+    "day": {
+        "id": "day",
+        "title": "1 день",
+        "description": "Пробный доступ к алертам бота на сутки.",
+        "stars": 15,
+        "duration_days": 1,
+    },
+    "week": {
+        "id": "week",
+        "title": "1 неделя",
+        "description": "Недорогой доступ к алертам на неделю.",
+        "stars": 69,
+        "duration_days": 7,
+    },
+    "month": {
+        "id": "month",
+        "title": "1 месяц",
+        "description": "Самый удобный тариф для постоянного поиска.",
+        "stars": 199,
+        "duration_days": 30,
+    },
+    "forever": {
+        "id": "forever",
+        "title": "Навсегда",
+        "description": "Разовая покупка без продления.",
+        "stars": 999,
+        "duration_days": None,
+    },
+}
+
+
+class SubscriptionRepository:
+    def plans(self) -> list[dict]:
+        return list(SUBSCRIPTION_PLANS.values())
+
+    def plan(self, plan_id: str) -> dict | None:
+        return SUBSCRIPTION_PLANS.get(plan_id)
+
+    def get(self, user_id: int | str) -> dict:
+        now = utc_now()
+        with connect() as conn:
+            row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
+        if not row:
+            return {
+                "active": False,
+                "plan_id": None,
+                "status": "inactive",
+                "started_at": None,
+                "expires_at": None,
+                "updated_at": None,
+                "plans": self.plans(),
+            }
+        data = dict(row)
+        active = data["status"] == "active" and (not data.get("expires_at") or data["expires_at"] > now)
+        data["active"] = active
+        data["plans"] = self.plans()
+        return data
+
+    def activate(
+        self,
+        user_id: int | str,
+        plan_id: str,
+        payload: str,
+        currency: str,
+        total_amount: int,
+        telegram_payment_charge_id: str | None = None,
+        provider_payment_charge_id: str | None = None,
+    ) -> dict:
+        plan = self.plan(plan_id)
+        if not plan:
+            raise ValueError(f"Unknown subscription plan: {plan_id}")
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
+        with connect() as conn:
+            current = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
+            if plan["duration_days"] is None:
+                expires_at = None
+            else:
+                base = now_dt
+                if current and current["expires_at"]:
+                    try:
+                        parsed = datetime.fromisoformat(current["expires_at"])
+                        if parsed > now_dt:
+                            base = parsed
+                    except ValueError:
+                        pass
+                expires_at = (base + timedelta(days=plan["duration_days"])).isoformat()
+            conn.execute(
+                """
+                INSERT INTO subscriptions (user_id, plan_id, status, started_at, expires_at, updated_at)
+                VALUES (?, ?, 'active', ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    plan_id=excluded.plan_id,
+                    status='active',
+                    expires_at=excluded.expires_at,
+                    updated_at=excluded.updated_at
+                """,
+                (str(user_id), plan_id, now, expires_at, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO subscription_payments (
+                    user_id, plan_id, payload, currency, total_amount,
+                    telegram_payment_charge_id, provider_payment_charge_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(user_id),
+                    plan_id,
+                    payload,
+                    currency,
+                    total_amount,
+                    telegram_payment_charge_id,
+                    provider_payment_charge_id,
+                    now,
+                ),
+            )
+        return self.get(user_id)

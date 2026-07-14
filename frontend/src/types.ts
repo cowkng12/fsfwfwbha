@@ -67,3 +67,21 @@ export type FilterState = {
   minPrice: string;
   maxPrice: string;
 };
+
+export type SubscriptionPlan = {
+  id: string;
+  title: string;
+  description: string;
+  stars: number;
+  duration_days?: number | null;
+};
+
+export type SubscriptionStatus = {
+  active: boolean;
+  plan_id?: string | null;
+  status: string;
+  started_at?: string | null;
+  expires_at?: string | null;
+  updated_at?: string | null;
+  plans: SubscriptionPlan[];
+};

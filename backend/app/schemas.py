@@ -58,3 +58,30 @@ class Listing(BaseModel):
 class ResultsResponse(BaseModel):
     items: list[Listing]
     last_research_at: str | None
+
+
+class SubscriptionPlan(BaseModel):
+    id: str
+    title: str
+    description: str
+    stars: int
+    duration_days: int | None = None
+
+
+class SubscriptionStatus(BaseModel):
+    active: bool
+    plan_id: str | None = None
+    status: str
+    started_at: str | None = None
+    expires_at: str | None = None
+    updated_at: str | None = None
+    plans: list[SubscriptionPlan]
+
+
+class SubscriptionInvoiceRequest(BaseModel):
+    plan_id: str
+
+
+class SubscriptionInvoiceResponse(BaseModel):
+    invoice_link: str
+    plan: SubscriptionPlan
