@@ -99,6 +99,11 @@ class TelegramBotService:
             raise RuntimeError("Telegram did not return invoice link")
         return str(result)
 
+    async def get_me(self) -> dict:
+        response = await self._post("getMe", {})
+        result = response.get("result")
+        return result if isinstance(result, dict) else {}
+
     async def answer_pre_checkout(self, pre_checkout: dict) -> None:
         await self._post("answerPreCheckoutQuery", {"pre_checkout_query_id": pre_checkout.get("id"), "ok": True})
 

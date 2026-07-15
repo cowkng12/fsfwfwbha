@@ -20,6 +20,19 @@ class MrktClient:
         self._gift_collections_cache: tuple[float, list[dict]] | None = None
 
     async def _fetch_token_from_telegram(self) -> str:
+        init_data = await self._fetch_init_data_from_telegram()
+
+        async with AsyncSession(impersonate="chrome", timeout=30) as http:
+            response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
+            response.raise_for_status()
+            token = response.json().get("token")
+        if not token:
+            raise RuntimeError("MRKT auth did not return token")
+        self._token = token
+        self._cookie = f"access_token={token}"
+        return token
+
+    async def _fetch_init_data_from_telegram(self) -> str:
         if not self.settings.telegram_api_id or not self.settings.telegram_api_hash or not self.settings.telegram_session:
             raise RuntimeError("MRKT auth requires TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION")
 
@@ -37,16 +50,7 @@ class MrktClient:
             app = InputBotAppShortName(bot_id=bot, short_name="app")
             web_view = await client(RequestAppWebViewRequest(peer=peer, app=app, platform="android"))
             init_data = unquote(web_view.url.split("tgWebAppData=", 1)[1].split("&tgWebAppVersion", 1)[0])
-
-        async with AsyncSession(impersonate="chrome", timeout=30) as http:
-            response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
-            response.raise_for_status()
-            token = response.json().get("token")
-        if not token:
-            raise RuntimeError("MRKT auth did not return token")
-        self._token = token
-        self._cookie = f"access_token={token}"
-        return token
+        return init_data
 
     async def token(self) -> str:
         return self._token or await self._fetch_token_from_telegram()
@@ -86,22 +90,15 @@ class MrktClient:
         use_default_max_price: bool = True,
     ) -> dict:
         effective_max_price = max_price if max_price is not None else (self.settings.mrkt_max_price if use_default_max_price else None)
-        payload = {
-            "collectionNames": collection_names,
-            "modelNames": model_names or [],
-            "backdropNames": backdrop_names or [],
-            "symbolNames": [],
-            "ordering": "Price",
-            "lowToHigh": True,
-            "maxPrice": self._ton_to_nano(effective_max_price),
-            "minPrice": self._ton_to_nano(min_price),
-            "mintable": None,
-            "number": None,
-            "count": min(count, 20),
-            "cursor": cursor,
-            "query": None,
-            "promotedFirst": False,
-        }
+        payload = self._saling_payload(
+            collection_names,
+            model_names=model_names,
+            backdrop_names=backdrop_names,
+            count=count,
+            cursor=cursor,
+            min_price=min_price,
+            max_price=effective_max_price,
+        )
         headers = self._headers(await self.token())
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
@@ -117,6 +114,58 @@ class MrktClient:
             except Exception:
                 raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
         return payload
+
+    async def token_diagnostics(self) -> dict:
+        result: dict = {
+            "has_mrkt_auth_token": bool(self.settings.mrkt_auth_token),
+            "has_telegram_api_id": bool(self.settings.telegram_api_id),
+            "has_telegram_api_hash": bool(self.settings.telegram_api_hash),
+            "has_telegram_session": bool(self.settings.telegram_session),
+        }
+        payload = self._saling_payload(["Airplane"], count=1, max_price=self.settings.mrkt_research_max_price)
+        if self._token:
+            try:
+                async with AsyncSession(impersonate="chrome", timeout=30) as http:
+                    response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=self._headers(self._token), json=payload)
+                result["cached_token_status"] = response.status_code
+                result["cached_token_ok"] = response.status_code < 400
+                if response.status_code >= 400:
+                    result["cached_token_error"] = response.text[:200]
+            except Exception as exc:
+                result["cached_token_ok"] = False
+                result["cached_token_error"] = str(exc)
+        else:
+            result["cached_token_ok"] = False
+            result["cached_token_status"] = None
+
+        init_data = ""
+        try:
+            init_data = await self._fetch_init_data_from_telegram()
+            result["telegram_session_ok"] = True
+            result["telegram_webview_ok"] = bool(init_data)
+        except Exception as exc:
+            result["telegram_session_ok"] = False
+            result["telegram_webview_ok"] = False
+            result["telegram_session_error"] = str(exc)
+
+        if init_data:
+            try:
+                async with AsyncSession(impersonate="chrome", timeout=30) as http:
+                    response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
+                result["fresh_auth_status"] = response.status_code
+                result["fresh_auth_ok"] = response.status_code < 400
+                if response.status_code < 400:
+                    token = response.json().get("token")
+                    result["fresh_auth_token_returned"] = bool(token)
+                    if token:
+                        self._token = token
+                        self._cookie = f"access_token={token}"
+                else:
+                    result["fresh_auth_error"] = response.text[:200]
+            except Exception as exc:
+                result["fresh_auth_ok"] = False
+                result["fresh_auth_error"] = str(exc)
+        return result
 
     async def gift_trait_options(self, trait: str, collection_names: list[str]) -> list[dict]:
         headers = self._headers(await self.token())
@@ -153,6 +202,33 @@ class MrktClient:
             collections = []
         self._gift_collections_cache = (monotonic(), collections)
         return collections
+
+    def _saling_payload(
+        self,
+        collection_names: list[str],
+        model_names: list[str] | None = None,
+        backdrop_names: list[str] | None = None,
+        count: int = 20,
+        cursor: str = "",
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> dict:
+        return {
+            "collectionNames": collection_names,
+            "modelNames": model_names or [],
+            "backdropNames": backdrop_names or [],
+            "symbolNames": [],
+            "ordering": "Price",
+            "lowToHigh": True,
+            "maxPrice": self._ton_to_nano(max_price),
+            "minPrice": self._ton_to_nano(min_price),
+            "mintable": None,
+            "number": None,
+            "count": min(count, 20),
+            "cursor": cursor,
+            "query": None,
+            "promotedFirst": False,
+        }
 
     def _public_headers(self) -> dict[str, str]:
         return {

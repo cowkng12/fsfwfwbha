@@ -483,6 +483,31 @@ async def debug_mrkt(client=Depends(mrkt_client)):
     return result
 
 
+@router.get("/debug/tokens")
+async def debug_tokens(
+    client=Depends(mrkt_client),
+    service: TelegramBotService = Depends(telegram_bot_service),
+):
+    result = {
+        "telegram_bot": {
+            "configured": bool(service.settings.telegram_bot_token),
+            "alert_chat_configured": bool(service.settings.telegram_alert_chat_id),
+        },
+        "mrkt": await client.token_diagnostics(),
+    }
+    try:
+        me = await service.get_me()
+        result["telegram_bot"].update({
+            "ok": bool(me),
+            "id": me.get("id"),
+            "username": me.get("username"),
+            "first_name": me.get("first_name"),
+        })
+    except Exception as exc:
+        result["telegram_bot"].update({"ok": False, "error": str(exc)})
+    return result
+
+
 @router.get("/debug/test-alert")
 @router.post("/debug/test-alert")
 async def debug_test_alert(
