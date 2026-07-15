@@ -1,4 +1,4 @@
-export type NftCatalogItem = { id: string; name: string; image: string; floorPrice?: number | null };
+export type NftCatalogItem = { id: string; name: string; image: string; floorPrice?: number | null; volume?: number | null };
 export type BackdropCatalogItem = { name: string; color: string; rarity: number };
 export type ModelCatalogItem = { name: string; image: string; rarity: number; floorPrice?: number };
 export type SymbolCatalogItem = { name: string; rarity: number };

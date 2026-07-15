@@ -136,13 +136,8 @@ class MrktClient:
     async def gift_collections(self) -> list[dict]:
         if self._gift_collections_cache and monotonic() - self._gift_collections_cache[0] < 300:
             return self._gift_collections_cache[1]
-        headers = self._headers(await self.token())
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
-            response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=headers)
-            if response.status_code in {401, 403}:
-                self._token = None
-                headers = self._headers(await self._fetch_token_from_telegram())
-                response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=headers)
+            response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=self._public_headers())
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT gift collections failed {response.status_code}: {response.text[:300]}")
             response.raise_for_status()
@@ -155,6 +150,17 @@ class MrktClient:
             collections = []
         self._gift_collections_cache = (monotonic(), collections)
         return collections
+
+    def _public_headers(self) -> dict[str, str]:
+        return {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+            "origin": "https://cdn.tgmrkt.io",
+            "referer": "https://cdn.tgmrkt.io/",
+            "sec-ch-ua-mobile": "?1",
+            "sec-ch-ua-platform": "Android",
+            "user-agent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+        }
 
     def _ton_to_nano(self, value: float | None) -> int | None:
         if value is None:

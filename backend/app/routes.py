@@ -189,12 +189,20 @@ def normalize_gift_collection(item: dict) -> dict:
         or ""
     ).strip()
     identifier = str(item.get("id") or item.get("slug") or item.get("collectionId") or name)
-    logo = item.get("logo") or item.get("image") or item.get("thumbnail") or item.get("cover") or ""
+    logo = (
+        item.get("logo")
+        or item.get("image")
+        or item.get("thumbnail")
+        or item.get("modelStickerThumbnailKey")
+        or item.get("cover")
+        or ""
+    )
     return {
         "id": identifier,
         "name": name,
         "image": cdn_url(logo),
         "floorPrice": collection_floor_ton(item),
+        "volume": collection_volume_ton(item),
         "searchNames": [name] if name else [],
     }
 
@@ -218,6 +226,16 @@ def collection_floor_ton(item: dict) -> float | None:
             return None
         numeric = float(value)
         return round(numeric / 1_000_000_000, 4) if numeric > 1_000_000 else round(numeric, 4)
+    except (TypeError, ValueError):
+        return None
+
+
+def collection_volume_ton(item: dict) -> float | None:
+    try:
+        value = item.get("volume")
+        if value in (None, ""):
+            return None
+        return round(float(value) / 1_000_000_000, 2)
     except (TypeError, ValueError):
         return None
 
