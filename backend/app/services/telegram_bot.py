@@ -535,7 +535,7 @@ class TelegramBotService:
             response = await client.post(url, json=payload)
             if response.is_error:
                 logger.warning("Telegram API %s failed: %s", method, response.text)
-            response.raise_for_status()
+                raise RuntimeError(f"Telegram API {method} failed with status {response.status_code}")
             return response.json()
 
     async def _post_file(self, method: str, data: dict, files: dict) -> dict:
@@ -550,5 +550,5 @@ class TelegramBotService:
             response = await client.post(url, data=form_data, files=files)
             if response.is_error:
                 logger.warning("Telegram API %s failed: %s", method, response.text)
-            response.raise_for_status()
+                raise RuntimeError(f"Telegram API {method} failed with status {response.status_code}")
             return response.json()
