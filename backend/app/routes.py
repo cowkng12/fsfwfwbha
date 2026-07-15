@@ -17,6 +17,7 @@ from app.catalog import (
     is_priority_collection_model,
 )
 from app.config import get_settings
+from app.database import database_path
 from app.repositories import ListingRepository, SearchPreferencesRepository, SubscriptionRepository
 from app.schemas import (
     FilterRequest,
@@ -492,6 +493,10 @@ async def debug_tokens(
         "telegram_bot": {
             "configured": bool(service.settings.telegram_bot_token),
             "alert_chat_configured": bool(service.settings.telegram_alert_chat_id),
+        },
+        "storage": {
+            "database_path": str(database_path()),
+            "persistent_disk_active": str(database_path()).replace("\\", "/").startswith("/var/data/"),
         },
         "mrkt": await client.token_diagnostics(),
     }

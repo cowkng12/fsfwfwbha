@@ -9,6 +9,12 @@ def database_path() -> Path:
     url = get_settings().database_url
     if not url.startswith("sqlite:///"):
         raise ValueError("Only sqlite:/// DATABASE_URL is supported by the bundled repository")
+    if url == "sqlite:///./data/app.sqlite3":
+        render_disk = Path("/var/data")
+        if render_disk.exists():
+            path = render_disk / "app.sqlite3"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            return path
     path = Path(url.removeprefix("sqlite:///"))
     if not path.is_absolute():
         path = Path(__file__).parents[1] / path
