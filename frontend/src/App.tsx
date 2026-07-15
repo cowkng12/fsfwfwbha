@@ -144,7 +144,7 @@ export function App() {
     <main className="app-shell">
       <section className="profile-card">
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row"><span>{budgetSummary(filters)}</span><small>{giftScopeSummary(filters.nfts, catalog?.nfts.length)}</small></div>
+        <div className="budget-row"><span>{budgetSummary(filters)}</span></div>
         <button className="subscription-button" onClick={() => setSubscriptionOpen(true)}>
           Моя подписка
           <span>{subscription?.active ? 'активна' : 'не активна'}</span>
@@ -195,12 +195,6 @@ function budgetSummary(filters: FilterState) {
   if (filters.minPrice) return `Бюджет: от ${filters.minPrice} TON`;
   if (filters.maxPrice) return `Бюджет: до ${filters.maxPrice} TON`;
   return 'Бюджет: без лимита';
-}
-
-function giftScopeSummary(selected: string[], total?: number) {
-  if (!selected.length) return `Подарки: все${total ? ` (${total})` : ''}`;
-  if (selected.length === 1) return `Подарок: ${selected[0]}`;
-  return `Подарки: ${selected.length}`;
 }
 
 function SubscriptionSheet({

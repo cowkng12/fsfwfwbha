@@ -424,6 +424,15 @@ async def debug_mrkt(client=Depends(mrkt_client)):
         })
     except Exception as exc:
         result.update({"token_ok": False, "error": str(exc)})
+    try:
+        collections = normalize_gift_collections(await client.gift_collections())
+        result.update({
+            "gift_collections_ok": True,
+            "gift_collections_count": len(collections),
+            "gift_collections_sample": [item["name"] for item in collections[:10]],
+        })
+    except Exception as exc:
+        result.update({"gift_collections_ok": False, "gift_collections_error": str(exc)})
     return result
 
 
