@@ -359,11 +359,11 @@ if ($TelegramApiId) { $lines = Set-EnvValue -Lines $lines -Key "TELEGRAM_API_ID"
 if ($TelegramApiHash) { $lines = Set-EnvValue -Lines $lines -Key "TELEGRAM_API_HASH" -Value $TelegramApiHash }
 if ($TelegramSession) { $lines = Set-EnvValue -Lines $lines -Key "TELEGRAM_SESSION" -Value $TelegramSession }
 
-if ($ClearMrktAuthToken) {
-    $lines = Set-EnvValue -Lines $lines -Key "MRKT_AUTH_TOKEN" -Value ""
-}
-elseif ($MrktAuthToken) {
+if ($MrktAuthToken) {
     $lines = Set-EnvValue -Lines $lines -Key "MRKT_AUTH_TOKEN" -Value $MrktAuthToken
+}
+elseif ($ClearMrktAuthToken) {
+    $lines = Set-EnvValue -Lines $lines -Key "MRKT_AUTH_TOKEN" -Value ""
 }
 
 Set-Content -LiteralPath $EnvPath -Value $lines -Encoding UTF8
