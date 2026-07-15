@@ -25,13 +25,16 @@ button { border: 0; cursor: pointer; }
 .meter-row::after { content: ''; display: block; height: 8px; border-radius: 999px; background: #414341; margin-top: -18px; z-index: 0; }
 .meter-row i { z-index: 1; }
 .meter-row.muted i { min-width: 0; width: 0; box-shadow: none; }
-.budget-row { margin-top: 16px; text-align: center; color: #dbeafe; font-size: 18px; font-weight: 900; }
+.budget-row { margin-top: 16px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; color: #dbeafe; font-size: 17px; font-weight: 900; }
+.budget-presets { display: grid; grid-template-columns: repeat(3, 40px); gap: 6px; }
+.budget-presets button { height: 32px; border-radius: 9px; background: #1c2328; border: 1px solid #3d4852; color: #cbd5e1; font-size: 14px; font-weight: 900; }
+.budget-presets button.active { background: #4287f5; border-color: #6aa4ff; color: #fff; box-shadow: 0 0 12px #3b82f655; }
 .subscription-button { width: 100%; min-height: 50px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-radius: 12px; background: #1e2f44; border: 1px solid #315f9b; color: #fff; font-size: 17px; font-weight: 900; }
 .subscription-button span { color: #8bbcff; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
-.section-head { display: grid; grid-template-columns: minmax(100px, .85fr) minmax(150px, 1.35fr) minmax(92px, .8fr); align-items: center; gap: 10px; margin: 0 0 28px; }
-.section-title { display: grid; place-items: center; min-width: 0; height: 54px; padding: 0 12px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 20px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-button { min-width: 0; width: 100%; height: 54px; padding: 0 12px; border-radius: 14px; color: #fff; background: #4287f5; font-size: 17px; font-weight: 900; box-shadow: 0 0 14px #3b82f655; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.clear-button { width: 100%; height: 46px; padding: 0 12px; border-radius: 12px; background: #2b2c2b; border: 1px solid #484a48; color: #f3f4f6; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.section-head { display: grid; grid-template-columns: minmax(76px, .92fr) minmax(88px, 1fr) minmax(76px, .92fr); align-items: center; gap: 8px; margin: 0 0 22px; }
+.section-title { display: grid; place-items: center; min-width: 0; height: 44px; padding: 0 10px; border-radius: 12px; color: #fff; background: #4287f5; font-size: 16px; font-weight: 900; box-shadow: 0 0 12px #3b82f64d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-button { min-width: 0; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; color: #fff; background: #4287f5; font-size: 15px; font-weight: 900; box-shadow: 0 0 12px #3b82f64d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clear-button { width: 100%; height: 40px; padding: 0 10px; border-radius: 11px; background: #2b2c2b; border: 1px solid #484a48; color: #f3f4f6; font-size: 14px; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .nft-card { min-width: 0; overflow: hidden; border-radius: 16px; background: #2b2c2b; border: 1px solid #343635; box-shadow: 0 14px 28px #0004; }
 .nft-card.is-new { border-color: #3b91ff; box-shadow: 0 0 0 1px #3b91ff, 0 0 24px #3b91ff33; }
@@ -116,9 +119,13 @@ mark { background: #ffde17; color: #050505; border-radius: 999px; padding: 1px 6
 .subscription-error { margin-top: 14px; padding: 12px; border-radius: 10px; background: #3b1d24; border: 1px solid #8f3448; color: #ffdbe3; font-weight: 800; }
 
 @media (max-width: 380px) {
+  .app-shell { padding-inline: 12px; }
+  .profile-card { padding: 20px 14px 18px; }
+  .budget-row { grid-template-columns: 1fr; justify-items: center; gap: 9px; font-size: 16px; }
+  .section-head { grid-template-columns: minmax(70px, .88fr) minmax(82px, 1fr) minmax(70px, .88fr); gap: 7px; }
+  .section-title, .picker-button { height: 42px; padding: 0 8px; border-radius: 11px; font-size: 14px; }
+  .clear-button { height: 38px; padding: 0 8px; border-radius: 10px; font-size: 13px; }
   .grid { gap: 10px; }
-  .section-head { grid-template-columns: 1fr 1fr; }
-  .picker-button { grid-column: 1 / -1; }
   .nft-card h2 { font-size: 15px; }
   .card-body { padding: 12px 10px 13px; }
   .trait-line { font-size: 13px; }

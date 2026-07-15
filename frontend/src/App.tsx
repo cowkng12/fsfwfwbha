@@ -4,6 +4,9 @@ import type { Catalog, FilterState, Listing, SubscriptionPlan, SubscriptionStatu
 import { ResultGrid } from './components/ResultGrid';
 import { GiftPickerSheet } from './components/GiftPickerSheet';
 
+const DEFAULT_BUDGET = '10';
+const BUDGET_OPTIONS = ['3', '5', '10'];
+
 type TelegramWebApp = {
   openInvoice?: (url: string, callback?: (status: string) => void) => void;
   openLink?: (url: string) => void;
@@ -12,7 +15,7 @@ type TelegramWebApp = {
 export function App() {
   const [items, setItems] = useState<Listing[]>([]);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [filters, setFilters] = useState<FilterState>(emptyFilters);
+  const [filters, setFilters] = useState<FilterState>({ ...emptyFilters, maxPrice: DEFAULT_BUDGET });
   const [lastResearchAt, setLastResearchAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -77,11 +80,16 @@ export function App() {
 
   const activeFilterCount = [filters.nfts, filters.models, filters.symbols, filters.backdrops]
     .filter((value) => value.length > 0).length
-    + [filters.number, filters.minPrice, filters.maxPrice].filter(Boolean).length;
+    + [filters.number, filters.minPrice].filter(Boolean).length
+    + (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET ? 1 : 0);
 
   const applyFilters = (nextFilters: FilterState) => {
-    setFilters(nextFilters);
+    setFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
     setPickerOpen(false);
+  };
+
+  const setBudget = (value: string) => {
+    setFilters((current) => ({ ...current, maxPrice: value }));
   };
 
   const clearFeed = async () => {
@@ -134,7 +142,20 @@ export function App() {
     <main className="app-shell">
       <section className="profile-card">
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row">Бюджет: до 10 TON</div>
+        <div className="budget-row">
+          <span>Бюджет: до {filters.maxPrice || DEFAULT_BUDGET} TON</span>
+          <div className="budget-presets" aria-label="Выбор бюджета">
+            {BUDGET_OPTIONS.map((value) => (
+              <button
+                className={filters.maxPrice === value ? 'active' : ''}
+                key={value}
+                onClick={() => setBudget(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
         <button className="subscription-button" onClick={() => setSubscriptionOpen(true)}>
           Моя подписка
           <span>{subscription?.active ? 'активна' : 'не активна'}</span>
@@ -143,7 +164,7 @@ export function App() {
 
       <div className="section-head">
         <div className="section-title">Листинг</div>
-        <button className="picker-button" onClick={() => setPickerOpen(true)}>Выбрать подарок{activeFilterCount ? ` · ${activeFilterCount}` : ''}</button>
+        <button className="picker-button" onClick={() => setPickerOpen(true)}>Подарок{activeFilterCount ? ` · ${activeFilterCount}` : ''}</button>
         <button className="clear-button" onClick={clearFeed}>Очистить</button>
       </div>
 
