@@ -370,12 +370,16 @@ class TelegramBotService:
         }
         if listing.telegram_url:
             payload["link_preview_options"] = {
-                "is_disabled": True,
+                "is_disabled": False,
+                "url": listing.telegram_url,
+                "prefer_large_media": True,
+                "show_above_text": False,
             }
         if listing.marketplace_url:
             payload["reply_markup"] = {"inline_keyboard": [[{"text": "Открыть лот", "url": listing.marketplace_url}]]}
         await self._post("sendMessage", payload)
-        await self._send_listing_preview(listing, chat_id=chat_id)
+        if not listing.telegram_url:
+            await self._send_listing_preview(listing, chat_id=chat_id)
 
     async def _send_listing_preview(self, listing: Listing, chat_id: str | int | None = None) -> None:
         if not listing.image_url:
