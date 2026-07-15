@@ -3,9 +3,9 @@ import { ACCESS_DENIED_MESSAGE, clearListings, createSubscriptionInvoice, emptyF
 import type { Catalog, FilterState, Listing, SubscriptionPlan, SubscriptionStatus } from './types';
 import { ResultGrid } from './components/ResultGrid';
 import { GiftPickerSheet } from './components/GiftPickerSheet';
+import { BudgetSheet } from './components/BudgetSheet';
 
 const DEFAULT_BUDGET = '10';
-const BUDGET_OPTIONS = ['3', '5', '10'];
 
 type TelegramWebApp = {
   openInvoice?: (url: string, callback?: (status: string) => void) => void;
@@ -22,6 +22,7 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
@@ -88,8 +89,9 @@ export function App() {
     setPickerOpen(false);
   };
 
-  const setBudget = (value: string) => {
-    setFilters((current) => ({ ...current, maxPrice: value }));
+  const applyBudget = (nextFilters: FilterState) => {
+    setFilters(nextFilters);
+    setBudgetOpen(false);
   };
 
   const clearFeed = async () => {
@@ -142,20 +144,7 @@ export function App() {
     <main className="app-shell">
       <section className="profile-card">
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row">
-          <span>Бюджет: до {filters.maxPrice || DEFAULT_BUDGET} TON</span>
-          <div className="budget-presets" aria-label="Выбор бюджета">
-            {BUDGET_OPTIONS.map((value) => (
-              <button
-                className={filters.maxPrice === value ? 'active' : ''}
-                key={value}
-                onClick={() => setBudget(value)}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="budget-row"><span>{budgetSummary(filters)}</span><small>{giftScopeSummary(filters.nfts, catalog?.nfts.length)}</small></div>
         <button className="subscription-button" onClick={() => setSubscriptionOpen(true)}>
           Моя подписка
           <span>{subscription?.active ? 'активна' : 'не активна'}</span>
@@ -164,6 +153,7 @@ export function App() {
 
       <div className="section-head">
         <div className="section-title">Листинг</div>
+        <button className="budget-button" onClick={() => setBudgetOpen(true)}>Бюджет</button>
         <button className="picker-button" onClick={() => setPickerOpen(true)}>Подарок{activeFilterCount ? ` · ${activeFilterCount}` : ''}</button>
         <button className="clear-button" onClick={clearFeed}>Очистить</button>
       </div>
@@ -183,6 +173,10 @@ export function App() {
         <GiftPickerSheet catalog={catalog} filters={filters} symbols={symbols} onClose={() => setPickerOpen(false)} onApply={applyFilters} />
       )}
 
+      {budgetOpen && catalog && (
+        <BudgetSheet catalog={catalog} filters={filters} listings={items} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
+      )}
+
       {subscriptionOpen && (
         <SubscriptionSheet
           status={subscription}
@@ -194,6 +188,19 @@ export function App() {
       )}
     </main>
   );
+}
+
+function budgetSummary(filters: FilterState) {
+  if (filters.minPrice && filters.maxPrice) return `Бюджет: ${filters.minPrice}-${filters.maxPrice} TON`;
+  if (filters.minPrice) return `Бюджет: от ${filters.minPrice} TON`;
+  if (filters.maxPrice) return `Бюджет: до ${filters.maxPrice} TON`;
+  return 'Бюджет: без лимита';
+}
+
+function giftScopeSummary(selected: string[], total?: number) {
+  if (!selected.length) return `Подарки: все${total ? ` (${total})` : ''}`;
+  if (selected.length === 1) return `Подарок: ${selected[0]}`;
+  return `Подарки: ${selected.length}`;
 }
 
 function SubscriptionSheet({
