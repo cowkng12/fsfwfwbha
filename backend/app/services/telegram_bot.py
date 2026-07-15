@@ -68,6 +68,12 @@ class TelegramBotService:
         if text.startswith("/subscribe"):
             await self.send_subscribe(chat_id)
             return
+        if text.startswith("/grant"):
+            await self.handle_grant_command(chat_id, user_id, text)
+            return
+        if text.startswith("/revoke"):
+            await self.handle_revoke_command(chat_id, user_id, text)
+            return
         if text.startswith("/start"):
             await self.send_start(chat_id)
 
@@ -124,12 +130,139 @@ class TelegramBotService:
             },
         )
 
+    async def handle_grant_command(self, chat_id: int, admin_user_id: int | None, text: str) -> None:
+        if not self._is_admin(chat_id, admin_user_id):
+            await self.send_admin_denied(chat_id)
+            return
+        parts = text.split()
+        if len(parts) != 3:
+            await self.send_grant_usage(chat_id)
+            return
+        target_user_id = self._parse_telegram_id(parts[1])
+        days = self._parse_grant_days(parts[2])
+        if target_user_id is None or days == 0:
+            await self.send_grant_usage(chat_id)
+            return
+        status = SubscriptionRepository().grant(target_user_id, days, granted_by=admin_user_id or chat_id)
+        expires_at = status.get("expires_at")
+        expires_text = "навсегда" if not expires_at else self._format_date(expires_at)
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": (
+                    "<b>Доступ выдан</b>\n"
+                    f"Пользователь: <code>{target_user_id}</code>\n"
+                    f"Доступ: <b>{escape(expires_text)}</b>"
+                ),
+                "parse_mode": "HTML",
+            },
+        )
+        await self._try_notify_granted_user(target_user_id, expires_text)
+
+    async def handle_revoke_command(self, chat_id: int, admin_user_id: int | None, text: str) -> None:
+        if not self._is_admin(chat_id, admin_user_id):
+            await self.send_admin_denied(chat_id)
+            return
+        parts = text.split()
+        if len(parts) != 2:
+            await self._post(
+                "sendMessage",
+                {
+                    "chat_id": chat_id,
+                    "text": "Формат: <code>/revoke 123456789</code>",
+                    "parse_mode": "HTML",
+                },
+            )
+            return
+        target_user_id = self._parse_telegram_id(parts[1])
+        if target_user_id is None:
+            await self._post(
+                "sendMessage",
+                {
+                    "chat_id": chat_id,
+                    "text": "Telegram ID должен быть числом. Например: <code>/revoke 123456789</code>",
+                    "parse_mode": "HTML",
+                },
+            )
+            return
+        SubscriptionRepository().revoke(target_user_id)
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": f"<b>Доступ отозван</b>\nПользователь: <code>{target_user_id}</code>",
+                "parse_mode": "HTML",
+            },
+        )
+        await self._try_notify_revoked_user(target_user_id)
+
     def _is_allowed(self, chat_id: int, user_id: int | None) -> bool:
         allowed_chats = self.settings.telegram_allowed_chat_id_set
         allowed_users = self.settings.telegram_allowed_user_id_set
         if not allowed_chats and not allowed_users:
             return True
+        if user_id is not None and SubscriptionRepository().get(user_id)["active"]:
+            return True
         return chat_id in allowed_chats or (user_id is not None and user_id in allowed_users)
+
+    def _is_admin(self, chat_id: int, user_id: int | None) -> bool:
+        allowed_chats = self.settings.telegram_allowed_chat_id_set
+        allowed_users = self.settings.telegram_allowed_user_id_set
+        return chat_id in allowed_chats or (user_id is not None and user_id in allowed_users)
+
+    def _parse_telegram_id(self, value: str) -> int | None:
+        value = value.strip()
+        if not value.isdigit():
+            return None
+        parsed = int(value)
+        return parsed if parsed > 0 else None
+
+    def _parse_grant_days(self, value: str) -> int | None:
+        normalized = value.strip().lower()
+        if normalized in {"forever", "infinite", "навсегда", "вечность"}:
+            return None
+        if not normalized.isdigit():
+            return 0
+        days = int(normalized)
+        if days < 1 or days > 3650:
+            return 0
+        return days
+
+    async def send_admin_denied(self, chat_id: int) -> None:
+        await self._post("sendMessage", {"chat_id": chat_id, "text": "Эта команда доступна только админу."})
+
+    async def send_grant_usage(self, chat_id: int) -> None:
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": (
+                    "Формат: <code>/grant 123456789 30</code>\n"
+                    "Или навсегда: <code>/grant 123456789 forever</code>"
+                ),
+                "parse_mode": "HTML",
+            },
+        )
+
+    async def _try_notify_granted_user(self, user_id: int, expires_text: str) -> None:
+        try:
+            await self._post(
+                "sendMessage",
+                {
+                    "chat_id": user_id,
+                    "text": f"<b>Вам выдали доступ</b>\nДоступ: <b>{escape(expires_text)}</b>",
+                    "parse_mode": "HTML",
+                },
+            )
+        except Exception as exc:
+            logger.info("Cannot notify granted user %s: %s", user_id, exc)
+
+    async def _try_notify_revoked_user(self, user_id: int) -> None:
+        try:
+            await self._post("sendMessage", {"chat_id": user_id, "text": "Ваш доступ к боту был отозван."})
+        except Exception as exc:
+            logger.info("Cannot notify revoked user %s: %s", user_id, exc)
 
     async def send_start(self, chat_id: int) -> None:
         app_url = (self.settings.public_base_url or "").rstrip("/")

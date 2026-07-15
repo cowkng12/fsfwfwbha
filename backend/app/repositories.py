@@ -514,3 +514,63 @@ class SubscriptionRepository:
                 ),
             )
         return self.get(user_id)
+
+    def grant(self, user_id: int | str, days: int | None, granted_by: int | str | None = None) -> dict:
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
+        expires_at: str | None
+        with connect() as conn:
+            current = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
+            if days is None:
+                expires_at = None
+                plan_id = "manual_forever"
+            else:
+                base = now_dt
+                if current and current["status"] == "active" and current["expires_at"]:
+                    try:
+                        parsed = datetime.fromisoformat(current["expires_at"])
+                        if parsed > now_dt:
+                            base = parsed
+                    except ValueError:
+                        pass
+                expires_at = (base + timedelta(days=days)).isoformat()
+                plan_id = "manual"
+            payload = f"admin_grant:{granted_by or 'unknown'}:{user_id}:{int(now_dt.timestamp())}"
+            conn.execute(
+                """
+                INSERT INTO subscriptions (user_id, plan_id, status, started_at, expires_at, updated_at)
+                VALUES (?, ?, 'active', ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    plan_id=excluded.plan_id,
+                    status='active',
+                    expires_at=excluded.expires_at,
+                    updated_at=excluded.updated_at
+                """,
+                (str(user_id), plan_id, now, expires_at, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO subscription_payments (
+                    user_id, plan_id, payload, currency, total_amount,
+                    telegram_payment_charge_id, provider_payment_charge_id, created_at
+                ) VALUES (?, ?, ?, 'ADMIN', 0, NULL, NULL, ?)
+                """,
+                (str(user_id), plan_id, payload, now),
+            )
+        return self.get(user_id)
+
+    def revoke(self, user_id: int | str) -> dict:
+        now = utc_now()
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO subscriptions (user_id, plan_id, status, started_at, expires_at, updated_at)
+                VALUES (?, 'manual', 'revoked', ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    status='revoked',
+                    expires_at=excluded.expires_at,
+                    updated_at=excluded.updated_at
+                """,
+                (str(user_id), now, now, now),
+            )
+        return self.get(user_id)
