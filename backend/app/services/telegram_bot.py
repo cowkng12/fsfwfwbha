@@ -36,6 +36,7 @@ class TelegramBotService:
             await self._post("setMyCommands", {"commands": [
                 {"command": "start", "description": "Открыть Mini App"},
                 {"command": "subscribe", "description": "Купить подписку"},
+                {"command": "testalert", "description": "Проверить alert-чат"},
             ]})
             await self._post("setChatMenuButton", {"menu_button": {"type": "web_app", "text": "Mini App", "web_app": {"url": self.settings.public_base_url.rstrip("/")}}})
             return await self._post("setWebhook", payload)
@@ -73,6 +74,9 @@ class TelegramBotService:
             return
         if text.startswith("/revoke"):
             await self.handle_revoke_command(chat_id, user_id, text)
+            return
+        if text.startswith("/testalert"):
+            await self.handle_test_alert_command(chat_id, user_id)
             return
         if text.startswith("/start"):
             await self.send_start(chat_id)
@@ -196,6 +200,27 @@ class TelegramBotService:
             },
         )
         await self._try_notify_revoked_user(target_user_id)
+
+    async def handle_test_alert_command(self, chat_id: int, admin_user_id: int | None) -> None:
+        if not self._is_admin(chat_id, admin_user_id):
+            await self.send_admin_denied(chat_id)
+            return
+        if not self.settings.telegram_alert_chat_id:
+            await self._post("sendMessage", {"chat_id": chat_id, "text": "TELEGRAM_ALERT_CHAT_ID не настроен."})
+            return
+        try:
+            await self._post(
+                "sendMessage",
+                {
+                    "chat_id": self.settings.telegram_alert_chat_id,
+                    "text": "<b>FloorHunt test alert</b>\nСообщения в alert-чат доходят.",
+                    "parse_mode": "HTML",
+                },
+            )
+        except Exception as exc:
+            await self._post("sendMessage", {"chat_id": chat_id, "text": f"Тест не прошёл: {exc}"})
+            return
+        await self._post("sendMessage", {"chat_id": chat_id, "text": "Тестовое сообщение отправлено в alert-чат."})
 
     def _is_allowed(self, chat_id: int, user_id: int | None) -> bool:
         allowed_chats = self.settings.telegram_allowed_chat_id_set
