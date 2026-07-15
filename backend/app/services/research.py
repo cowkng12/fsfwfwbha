@@ -1,12 +1,15 @@
 import asyncio
+import colorsys
 import json
 import re
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from hashlib import sha1
+from io import BytesIO
 from typing import Any
 
 import httpx
+from PIL import Image, UnidentifiedImageError
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -175,6 +178,7 @@ class ResearchService:
         self._relaxed_model_cache: dict[str, list[str]] = {}
         self._model_sales_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self._active_research_max_price: float | None = None
+        self._image_palette_cache: dict[str, set[str]] = {}
 
     async def run(
         self,
@@ -455,6 +459,8 @@ class ResearchService:
             "backdrop_name": backdrop_name,
             "backdrop_rarity": self._rarity_value(self._deep_pick(gift, "backdropRarityPerMille", "backdropRarity")),
             "symbol_name": self._deep_pick(gift, "symbolName", "symbol"),
+            "model_palette": sorted(await self._visual_model_palette(gift, model_name)),
+            "backdrop_palette": sorted(self._visual_backdrop_palette(gift, backdrop_name)),
             "image_url": self._fragment_image_url_from_url(telegram_url) or self._fragment_image_url(collection, number) or self._image_url(gift),
             "price": price or 0,
             "floor_price": floor_price,
@@ -524,7 +530,12 @@ class ResearchService:
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
-        has_harmony = self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name"))
+        has_harmony = self._has_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
+        )
         if not has_harmony:
             return False
         has_value_signal = has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
@@ -542,6 +553,8 @@ class ResearchService:
         has_visual_signal = self._has_color_harmony(
             listing.get("model_name"),
             listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
         )
         return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True)
 
@@ -561,9 +574,15 @@ class ResearchService:
         has_floor_discount = bool(gift_floor and listing.get("price") and listing["price"] <= gift_floor * 0.95)
         return has_model_floor or has_model_rarity or has_backdrop_rarity or has_floor_discount
 
-    def _has_color_harmony(self, model_name: str | None, backdrop_name: str | None) -> bool:
-        model_palette = self._palette_for_model(model_name)
-        backdrop_palette = self._palette_for_backdrop(backdrop_name)
+    def _has_color_harmony(
+        self,
+        model_name: str | None,
+        backdrop_name: str | None,
+        model_palette: list[str] | set[str] | None = None,
+        backdrop_palette: list[str] | set[str] | None = None,
+    ) -> bool:
+        model_palette = set(model_palette or []) or self._palette_for_model(model_name)
+        backdrop_palette = set(backdrop_palette or []) or self._palette_for_backdrop(backdrop_name)
         if not model_palette or not backdrop_palette:
             return False
         if model_palette & backdrop_palette:
@@ -601,7 +620,12 @@ class ResearchService:
         has_expensive_model = bool(model_floor and model_floor >= self.mrkt.settings.mrkt_min_model_floor)
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
-        has_harmony = self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name"))
+        has_harmony = self._has_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
+        )
         has_liquidity = self._has_liquidity_signal(listing, relaxed=True)
         if not has_harmony:
             reasons.append("no_color_harmony")
@@ -621,7 +645,14 @@ class ResearchService:
             "model_floor": listing.get("model_floor_price"),
             "model_rarity": listing.get("model_rarity"),
             "backdrop_rarity": listing.get("backdrop_rarity"),
-            "harmony": self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name")),
+            "model_palette": listing.get("model_palette"),
+            "backdrop_palette": listing.get("backdrop_palette"),
+            "harmony": self._has_color_harmony(
+                listing.get("model_name"),
+                listing.get("backdrop_name"),
+                listing.get("model_palette"),
+                listing.get("backdrop_palette"),
+            ),
             "liquidity": self._has_liquidity_signal(listing, relaxed=True),
         }
 
@@ -1035,6 +1066,98 @@ class ResearchService:
         if not normalized:
             return set()
         return self._palette_from_text(normalized)
+
+    async def _visual_model_palette(self, gift: dict[str, Any], model_name: str | None) -> set[str]:
+        palette = set(self._palette_for_model(model_name))
+        image_url = self._model_thumbnail_url(gift)
+        if image_url:
+            palette.update(await self._palette_from_image(image_url))
+        return palette
+
+    def _visual_backdrop_palette(self, gift: dict[str, Any], backdrop_name: str | None) -> set[str]:
+        palette = set(self._palette_for_backdrop(backdrop_name))
+        for key in (
+            "backdropColorsCenterColor",
+            "backdropColorsEdgeColor",
+            "backdropColorsTextColor",
+            "backdropColorsSymbolColor",
+        ):
+            family = self._color_family_from_int(self._deep_pick(gift, key))
+            if family:
+                palette.add(family)
+        return palette
+
+    def _model_thumbnail_url(self, gift: dict[str, Any]) -> str | None:
+        key = self._deep_pick(gift, "modelStickerThumbnailKey", "modelThumbnailKey")
+        if isinstance(key, str) and key:
+            return f"https://cdn.tgmrkt.io/{key.lstrip('/')}"
+        return None
+
+    async def _palette_from_image(self, image_url: str) -> set[str]:
+        if image_url in self._image_palette_cache:
+            return self._image_palette_cache[image_url]
+        palette: set[str] = set()
+        try:
+            async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                response = await client.get(image_url, headers={"user-agent": "Mozilla/5.0"})
+                response.raise_for_status()
+            image = Image.open(BytesIO(response.content)).convert("RGBA")
+            image.thumbnail((96, 96))
+        except (httpx.HTTPError, UnidentifiedImageError, OSError):
+            self._image_palette_cache[image_url] = palette
+            return palette
+
+        counts: dict[str, int] = {}
+        total = 0
+        for red, green, blue, alpha in image.getdata():
+            if alpha < 48:
+                continue
+            family = self._color_family_from_rgb(red, green, blue)
+            if not family:
+                continue
+            counts[family] = counts.get(family, 0) + 1
+            total += 1
+        if counts and total:
+            strongest = max(counts.values())
+            palette = {
+                family
+                for family, count in counts.items()
+                if count >= strongest * 0.18 or count / total >= 0.08
+            }
+        self._image_palette_cache[image_url] = palette
+        return palette
+
+    def _color_family_from_int(self, value: Any) -> str | None:
+        try:
+            integer = int(value)
+        except (TypeError, ValueError):
+            return None
+        return self._color_family_from_rgb((integer >> 16) & 255, (integer >> 8) & 255, integer & 255)
+
+    def _color_family_from_rgb(self, red: int, green: int, blue: int) -> str | None:
+        hue, lightness, saturation = colorsys.rgb_to_hls(red / 255, green / 255, blue / 255)
+        hue_degrees = hue * 360
+        if lightness < 0.16:
+            return "black"
+        if saturation < 0.14:
+            return "white" if lightness > 0.82 else "silver"
+        if 18 <= hue_degrees < 45 and lightness < 0.48:
+            return "brown"
+        if hue_degrees < 15 or hue_degrees >= 345:
+            return "red"
+        if hue_degrees < 38:
+            return "orange"
+        if hue_degrees < 65:
+            return "gold"
+        if hue_degrees < 155:
+            return "green"
+        if hue_degrees < 190:
+            return "cyan"
+        if hue_degrees < 252:
+            return "blue"
+        if hue_degrees < 292:
+            return "purple"
+        return "pink"
 
     def _palette_from_text(self, text: str) -> set[str]:
         palette: set[str] = set()
