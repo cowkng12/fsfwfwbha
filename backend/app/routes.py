@@ -112,8 +112,15 @@ def health():
 
 
 @router.get("/catalog")
-def catalog(_: int = Depends(require_telegram_user_id)):
-    return get_catalog()
+async def catalog(_: int = Depends(require_telegram_user_id), client=Depends(mrkt_client)):
+    base_catalog = get_catalog()
+    try:
+        collections = normalize_gift_collections(await client.gift_collections())
+    except Exception:
+        collections = []
+    if not collections:
+        return base_catalog
+    return {**base_catalog, "nfts": collections}
 
 
 @router.get("/catalog/traits")
@@ -158,6 +165,61 @@ def collection_search_names(collection_name: str) -> list[str]:
         if item.get("name") == collection_name:
             return item.get("searchNames") or [collection_name]
     return [collection_name]
+
+
+def normalize_gift_collections(items: list[dict]) -> list[dict]:
+    collections: dict[str, dict] = {}
+    for item in items:
+        normalized = normalize_gift_collection(item)
+        if normalized["name"]:
+            collections.setdefault(normalized["name"].lower(), normalized)
+    return sorted(collections.values(), key=lambda item: item["name"].lower())
+
+
+def normalize_gift_collection(item: dict) -> dict:
+    if not isinstance(item, dict):
+        name = str(item or "").strip()
+        return {"id": name, "name": name, "image": "", "floorPrice": None, "searchNames": [name] if name else []}
+    name = str(
+        item.get("title")
+        or item.get("name")
+        or item.get("collectionName")
+        or item.get("collectionTitle")
+        or item.get("giftName")
+        or ""
+    ).strip()
+    identifier = str(item.get("id") or item.get("slug") or item.get("collectionId") or name)
+    logo = item.get("logo") or item.get("image") or item.get("thumbnail") or item.get("cover") or ""
+    return {
+        "id": identifier,
+        "name": name,
+        "image": cdn_url(logo),
+        "floorPrice": collection_floor_ton(item),
+        "searchNames": [name] if name else [],
+    }
+
+
+def cdn_url(value: str | None) -> str:
+    if not value:
+        return ""
+    text = str(value)
+    if text.startswith(("http://", "https://", "data:")):
+        return text
+    return f"https://cdn.tgmrkt.io/{text.lstrip('/')}"
+
+
+def collection_floor_ton(item: dict) -> float | None:
+    nano_value = item.get("floorPriceNanoTons") or item.get("floorPriceNanoTONs")
+    if nano_value not in (None, ""):
+        return nano_ton(nano_value)
+    try:
+        value = item.get("floorPrice")
+        if value in (None, ""):
+            return None
+        numeric = float(value)
+        return round(numeric / 1_000_000_000, 4) if numeric > 1_000_000 else round(numeric, 4)
+    except (TypeError, ValueError):
+        return None
 
 
 def normalize_model(item: dict) -> dict:

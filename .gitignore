@@ -18,3 +18,4 @@ __pycache__/
 backend/data/app.sqlite3
 backend/*.session
 backend/*.session-journal
+scripts/mrkt-discovery-output/

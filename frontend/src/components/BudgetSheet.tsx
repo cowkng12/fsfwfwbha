@@ -89,7 +89,7 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
             <div className="budget-table-head"><button onClick={toggleAllVisible}>Выбрать все</button><span>Флор</span><span>Оборот</span><i /></div>
             <div className="budget-gift-list">
               {rows.map((item, index) => {
-                const itemStats = stats.get(item.name);
+                const itemStats = stats.get(item.name) ?? { floor: item.floorPrice ?? undefined };
                 const selected = draft.nfts.includes(item.name);
                 return (
                   <button className="budget-gift-item" key={item.id || item.name} onClick={() => toggleGift(item.name)}>

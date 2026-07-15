@@ -1,3 +1,4 @@
+from time import monotonic
 from urllib.parse import unquote
 
 import httpx
@@ -16,6 +17,7 @@ class MrktClient:
         self.settings = settings
         self._token = settings.mrkt_auth_token
         self._cookie = f"access_token={settings.mrkt_auth_token}" if settings.mrkt_auth_token else None
+        self._gift_collections_cache: tuple[float, list[dict]] | None = None
 
     async def _fetch_token_from_telegram(self) -> str:
         if not self.settings.telegram_api_id or not self.settings.telegram_api_hash or not self.settings.telegram_session:
@@ -130,6 +132,29 @@ class MrktClient:
             except Exception:
                 raise RuntimeError(f"MRKT {trait} returned non-JSON {response.status_code}: {response.text[:300]}")
         return data if isinstance(data, list) else []
+
+    async def gift_collections(self) -> list[dict]:
+        if self._gift_collections_cache and monotonic() - self._gift_collections_cache[0] < 300:
+            return self._gift_collections_cache[1]
+        headers = self._headers(await self.token())
+        async with AsyncSession(impersonate="chrome", timeout=45) as http:
+            response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=headers)
+            if response.status_code in {401, 403}:
+                self._token = None
+                headers = self._headers(await self._fetch_token_from_telegram())
+                response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=headers)
+            if response.status_code >= 400:
+                raise RuntimeError(f"MRKT gift collections failed {response.status_code}: {response.text[:300]}")
+            response.raise_for_status()
+            try:
+                data = response.json()
+            except Exception:
+                raise RuntimeError(f"MRKT gift collections returned non-JSON {response.status_code}: {response.text[:300]}")
+        collections = data if isinstance(data, list) else data.get("collections") if isinstance(data, dict) else []
+        if not isinstance(collections, list):
+            collections = []
+        self._gift_collections_cache = (monotonic(), collections)
+        return collections
 
     def _ton_to_nano(self, value: float | None) -> int | None:
         if value is None:
