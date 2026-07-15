@@ -33,6 +33,8 @@ PRIORITY_FILTER_RESULT_COUNT = 20
 RAW_CANDIDATE_SCAN_LIMIT = 40
 ACCEPTED_LISTINGS_PER_COLLECTION = 3
 MAX_LISTINGS_PER_RUN = 25
+SIMILAR_LISTINGS_PER_COLLECTION = 1
+MAX_SIMILAR_LISTINGS_PER_RUN = 5
 MODEL_SALE_SAMPLE_SIZE = 6
 MODEL_RECENT_SALES_LIMIT = 3
 COMBO_MARKET_MAX_PAGES = 3
@@ -134,6 +136,20 @@ COLOR_COMPATIBILITY: dict[str, set[str]] = {
     "orange": {"orange", "red", "gold", "brown"},
     "brown": {"brown", "gold", "orange", "black"},
 }
+COLOR_SOFT_COMPATIBILITY: dict[str, set[str]] = {
+    "black": {"green", "cyan", "orange", "pink"},
+    "white": {"green", "cyan", "purple", "pink", "orange"},
+    "silver": {"green", "cyan", "gold", "pink"},
+    "gold": {"orange", "brown", "green", "silver"},
+    "red": {"purple", "brown"},
+    "green": {"blue", "gold", "silver"},
+    "blue": {"green", "gold"},
+    "purple": {"red", "gold", "silver"},
+    "pink": {"black", "silver", "orange"},
+    "cyan": {"black", "gold", "purple"},
+    "orange": {"black", "white", "pink"},
+    "brown": {"red", "silver"},
+}
 
 
 class GiftTableParser(HTMLParser):
@@ -193,6 +209,7 @@ class ResearchService:
             search_max_price = max_price or self.mrkt.settings.mrkt_research_max_price
             self._active_research_max_price = search_max_price
             normalized: list[dict] = []
+            similar_normalized: list[dict] = []
             telegram_client = await self._telegram_client()
             try:
                 for name in collections:
@@ -201,19 +218,34 @@ class ResearchService:
                     try:
                         gifts = await self._candidate_gifts(name, search_min_price, search_max_price)
                         accepted_for_collection = 0
+                        similar_for_collection = 0
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
                             if self._is_quality_listing(listing):
-                                await self._enrich_model_sales(listing, telegram_client)
-                                await self._enrich_combo_market(listing)
-                                await self._enrich_public_metadata(listing)
-                                await self._enrich_unique_gift_metadata(listing, telegram_client)
+                                await self._enrich_listing(listing, telegram_client)
                                 normalized.append(listing)
                                 accepted_for_collection += 1
                                 if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
                                     break
+                            elif (
+                                len(similar_normalized) < MAX_SIMILAR_LISTINGS_PER_RUN
+                                and similar_for_collection < SIMILAR_LISTINGS_PER_COLLECTION
+                                and self._is_similar_quality_listing(listing)
+                            ):
+                                await self._enrich_listing(listing, telegram_client)
+                                similar_normalized.append(listing)
+                                similar_for_collection += 1
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
+                if normalized and similar_normalized:
+                    seen_ids = {item.get("external_id") for item in normalized}
+                    for listing in similar_normalized:
+                        if len(normalized) >= MAX_LISTINGS_PER_RUN:
+                            break
+                        if listing.get("external_id") in seen_ids:
+                            continue
+                        normalized.append(listing)
+                        seen_ids.add(listing.get("external_id"))
                 if not normalized:
                     normalized.extend(await self._relaxed_listings(collections, telegram_client, search_min_price, search_max_price))
             finally:
@@ -256,10 +288,7 @@ class ResearchService:
                 for gift in gifts:
                     listing = await self._normalize_gift(gift, name)
                     if self._is_relaxed_quality_listing(listing):
-                        await self._enrich_model_sales(listing, telegram_client)
-                        await self._enrich_combo_market(listing)
-                        await self._enrich_public_metadata(listing)
-                        await self._enrich_unique_gift_metadata(listing, telegram_client)
+                        await self._enrich_listing(listing, telegram_client)
                         normalized.append(listing)
                         accepted_for_collection += 1
                         if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
@@ -280,6 +309,7 @@ class ResearchService:
             },
             "total_candidates": 0,
             "strict_pass": 0,
+            "similar_pass": 0,
             "relaxed_pass": 0,
             "rejections": {},
             "collections": [],
@@ -287,7 +317,7 @@ class ResearchService:
         }
         rejection_counts: dict[str, int] = {}
         for collection in collections:
-            item = {"collection": collection, "candidates": 0, "strict_pass": 0, "relaxed_pass": 0, "examples": []}
+            item = {"collection": collection, "candidates": 0, "strict_pass": 0, "similar_pass": 0, "relaxed_pass": 0, "examples": []}
             try:
                 gifts = await self.mrkt.saling([collection], count=sample_size, max_price=self.mrkt.settings.mrkt_research_max_price)
                 item["candidates"] = len(gifts)
@@ -295,12 +325,15 @@ class ResearchService:
                 for gift in gifts:
                     listing = await self._normalize_gift(gift, collection)
                     strict_pass = self._is_quality_listing(listing)
+                    similar_pass = not strict_pass and self._is_similar_quality_listing(listing)
                     relaxed_pass = self._is_relaxed_quality_listing(listing)
                     item["strict_pass"] += int(strict_pass)
+                    item["similar_pass"] += int(similar_pass)
                     item["relaxed_pass"] += int(relaxed_pass)
                     summary["strict_pass"] += int(strict_pass)
+                    summary["similar_pass"] += int(similar_pass)
                     summary["relaxed_pass"] += int(relaxed_pass)
-                    if strict_pass or relaxed_pass:
+                    if strict_pass or similar_pass or relaxed_pass:
                         if len(summary["accepted_examples"]) < 10:
                             summary["accepted_examples"].append(self._debug_listing_summary(listing))
                     else:
@@ -310,8 +343,9 @@ class ResearchService:
                     if len(item["examples"]) < 3:
                         example = self._debug_listing_summary(listing)
                         example["strict_pass"] = strict_pass
+                        example["similar_pass"] = similar_pass
                         example["relaxed_pass"] = relaxed_pass
-                        example["reasons"] = [] if strict_pass or relaxed_pass else self._quality_rejection_reasons(listing)
+                        example["reasons"] = [] if strict_pass or similar_pass or relaxed_pass else self._quality_rejection_reasons(listing)
                         item["examples"].append(example)
             except Exception as exc:
                 item["error"] = str(exc)
@@ -558,6 +592,29 @@ class ResearchService:
         )
         return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True)
 
+    def _is_similar_quality_listing(self, listing: dict) -> bool:
+        if not listing.get("image_url") or not listing.get("price"):
+            return False
+        if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
+            return False
+        if listing["price"] > self._effective_research_max_price():
+            return False
+        if has_collection_quality_rules(listing.get("collection_name")):
+            return has_collection_specific_quality(
+                listing.get("collection_name"),
+                listing.get("model_name"),
+                listing.get("backdrop_name"),
+            )
+        gift_floor = listing.get("floor_price")
+        if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
+            return False
+        return self._has_soft_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
+        ) and self._has_liquidity_signal(listing, relaxed=True)
+
     def _effective_research_max_price(self) -> float:
         return self._active_research_max_price or self.mrkt.settings.mrkt_research_max_price
 
@@ -589,6 +646,24 @@ class ResearchService:
             return True
         for color in model_palette:
             if COLOR_COMPATIBILITY.get(color, set()) & backdrop_palette:
+                return True
+        return False
+
+    def _has_soft_color_harmony(
+        self,
+        model_name: str | None,
+        backdrop_name: str | None,
+        model_palette: list[str] | set[str] | None = None,
+        backdrop_palette: list[str] | set[str] | None = None,
+    ) -> bool:
+        if self._has_color_harmony(model_name, backdrop_name, model_palette, backdrop_palette):
+            return True
+        model_palette = set(model_palette or []) or self._palette_for_model(model_name)
+        backdrop_palette = set(backdrop_palette or []) or self._palette_for_backdrop(backdrop_name)
+        if not model_palette or not backdrop_palette:
+            return False
+        for color in model_palette:
+            if COLOR_SOFT_COMPATIBILITY.get(color, set()) & backdrop_palette:
                 return True
         return False
 
@@ -626,9 +701,17 @@ class ResearchService:
             listing.get("model_palette"),
             listing.get("backdrop_palette"),
         )
+        has_soft_harmony = self._has_soft_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
+        )
         has_liquidity = self._has_liquidity_signal(listing, relaxed=True)
         if not has_harmony:
             reasons.append("no_color_harmony")
+        if not has_soft_harmony:
+            reasons.append("no_soft_color_harmony")
         if not has_liquidity:
             reasons.append("no_liquidity_signal")
         if not any([has_premium_backdrop, has_expensive_model, has_rare_model, has_rare_backdrop]):
@@ -653,8 +736,20 @@ class ResearchService:
                 listing.get("model_palette"),
                 listing.get("backdrop_palette"),
             ),
+            "soft_harmony": self._has_soft_color_harmony(
+                listing.get("model_name"),
+                listing.get("backdrop_name"),
+                listing.get("model_palette"),
+                listing.get("backdrop_palette"),
+            ),
             "liquidity": self._has_liquidity_signal(listing, relaxed=True),
         }
+
+    async def _enrich_listing(self, listing: dict, client: TelegramClient | None) -> None:
+        await self._enrich_model_sales(listing, client)
+        await self._enrich_combo_market(listing)
+        await self._enrich_public_metadata(listing)
+        await self._enrich_unique_gift_metadata(listing, client)
 
     async def _enrich_model_sales(self, listing: dict, client: TelegramClient | None) -> None:
         sales = await self._model_recent_sales(
