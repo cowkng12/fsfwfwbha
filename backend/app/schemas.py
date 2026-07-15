@@ -85,3 +85,14 @@ class SubscriptionInvoiceRequest(BaseModel):
 class SubscriptionInvoiceResponse(BaseModel):
     invoice_link: str
     plan: SubscriptionPlan
+
+
+class SearchPreferences(BaseModel):
+    nfts: list[str] = Field(default_factory=list)
+    backdrops: list[str] = Field(default_factory=list)
+    models: list[str] = Field(default_factory=list)
+    symbols: list[str] = Field(default_factory=list)
+    number: str = ""
+    minPrice: str = ""
+    maxPrice: str = ""
+    updated_at: str | None = None

@@ -1,4 +1,4 @@
-import type { Catalog, FilterState, GiftTraitCatalog, Listing, SubscriptionPlan, SubscriptionStatus } from './types';
+import type { Catalog, FilterState, GiftTraitCatalog, Listing, SearchPreferences, SubscriptionPlan, SubscriptionStatus } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 export const ACCESS_DENIED_MESSAGE = 'Вы не внесены в белый список бота.';
@@ -67,6 +67,20 @@ export async function fetchResults(filters: FilterState = emptyFilters): Promise
 
 export async function clearListings(): Promise<{ deleted: number; archived: boolean }> {
   const response = await apiFetch('/api/listings/clear?confirm=true', 'Cannot clear listings', { method: 'POST' });
+  return response.json();
+}
+
+export async function fetchSearchPreferences(): Promise<SearchPreferences> {
+  const response = await apiFetch('/api/search-preferences', 'Cannot load search settings');
+  return response.json();
+}
+
+export async function saveSearchPreferences(filters: FilterState): Promise<SearchPreferences> {
+  const response = await apiFetch('/api/search-preferences', 'Cannot save search settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(filters),
+  });
   return response.json();
 }
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.database import init_db
-from app.repositories import ListingRepository, ResearchRunRepository, utc_now
+from app.repositories import ListingRepository, ResearchRunRepository, SearchPreferencesRepository, utc_now
 from app.routes import router
 from app.services.mrkt_client import MrktClient
 from app.services.research import ResearchService
@@ -35,8 +35,19 @@ async def run_research_cycle() -> dict[str, int | bool]:
         if not alerts_ready:
             baseline_count = repo.mark_alert_baseline(first_seen_before=started_at)
             alerts_ready = True
-        stored = await research.run()
-        sent = await telegram_bot.send_new_listing_alerts(repo, first_seen_after=started_at)
+        targets = SearchPreferencesRepository().active_targets()
+        stored = await research.run(
+            collection_names=targets["collection_names"],
+            min_price=targets["min_price"],
+            max_price=targets["max_price"],
+        )
+        sent = await telegram_bot.send_new_listing_alerts(
+            repo,
+            first_seen_after=started_at,
+            collection_names=targets["collection_names"],
+            min_price=targets["min_price"],
+            max_price=targets["max_price"],
+        )
         return {"stored": stored, "sent": sent, "baseline": baseline_count, "alerts_ready": alerts_ready}
 
 

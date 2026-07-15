@@ -68,6 +68,10 @@ export type FilterState = {
   maxPrice: string;
 };
 
+export type SearchPreferences = FilterState & {
+  updated_at?: string | null;
+};
+
 export type SubscriptionPlan = {
   id: string;
   title: string;

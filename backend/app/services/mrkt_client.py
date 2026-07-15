@@ -58,6 +58,7 @@ class MrktClient:
         backdrop_names: list[str] | None = None,
         count: int = 20,
         cursor: str = "",
+        min_price: float | None = None,
         max_price: float | None = None,
         use_default_max_price: bool = True,
     ) -> list[dict]:
@@ -67,6 +68,7 @@ class MrktClient:
             backdrop_names=backdrop_names,
             count=count,
             cursor=cursor,
+            min_price=min_price,
             max_price=max_price,
             use_default_max_price=use_default_max_price,
         )
@@ -79,6 +81,7 @@ class MrktClient:
         backdrop_names: list[str] | None = None,
         count: int = 20,
         cursor: str = "",
+        min_price: float | None = None,
         max_price: float | None = None,
         use_default_max_price: bool = True,
     ) -> dict:
@@ -91,7 +94,7 @@ class MrktClient:
             "ordering": "Price",
             "lowToHigh": True,
             "maxPrice": self._ton_to_nano(effective_max_price),
-            "minPrice": None,
+            "minPrice": self._ton_to_nano(min_price),
             "mintable": None,
             "number": None,
             "count": min(count, 20),

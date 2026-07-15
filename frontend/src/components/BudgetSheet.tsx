@@ -1,28 +1,26 @@
 import { useMemo, useState } from 'react';
-import type { Catalog, FilterState, Listing, NftCatalogItem } from '../types';
+import type { Catalog, FilterState, NftCatalogItem } from '../types';
 
 type Props = {
   catalog: Catalog;
   filters: FilterState;
-  listings: Listing[];
   onClose: () => void;
   onApply: (filters: FilterState) => void;
 };
 
-type GiftStats = {
-  floor?: number;
-  turnover?: number;
-};
+type SortKey = 'name' | 'floor' | 'turnover';
+type SortState = { key: SortKey; direction: 'asc' | 'desc' };
 
-export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Props) {
+export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
   const [draft, setDraft] = useState<FilterState>(filters);
   const [giftPickerOpen, setGiftPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const stats = useMemo(() => giftStats(listings), [listings]);
-  const rows = useMemo(
-    () => catalog.nfts.filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [catalog.nfts, query],
-  );
+  const [sort, setSort] = useState<SortState>({ key: 'name', direction: 'asc' });
+  const rows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = catalog.nfts.filter((item) => item.name.toLowerCase().includes(normalizedQuery));
+    return [...filtered].sort((a, b) => sortGifts(a, b, sort));
+  }, [catalog.nfts, query, sort]);
   const allVisibleNames = rows.map((item) => item.name);
   const allVisibleSelected = allVisibleNames.length > 0 && allVisibleNames.every((name) => draft.nfts.includes(name));
 
@@ -48,6 +46,13 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
 
   const clearBudget = () => {
     setDraft((current) => ({ ...current, nfts: [], minPrice: '', maxPrice: '' }));
+  };
+
+  const toggleSort = (key: SortKey) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -76,7 +81,7 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
             </button>
             <footer className="budget-actions">
               <button className="secondary" onClick={clearBudget}>Очистить</button>
-              <button className="primary" onClick={() => onApply(draft)}>Показать</button>
+              <button className="primary" onClick={() => onApply(draft)}>Сохранить</button>
             </footer>
           </>
         ) : (
@@ -86,10 +91,14 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
               <h2>Подарки</h2>
             </header>
             <label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
-            <div className="budget-table-head"><button onClick={toggleAllVisible}>Выбрать все</button><span>Флор</span><span>Оборот</span><i /></div>
+            <div className="budget-table-head">
+              <button onClick={toggleAllVisible}>Выбрать все</button>
+              <button className="sort-button" onClick={() => toggleSort('floor')}>Флор{sortLabel(sort, 'floor')}</button>
+              <button className="sort-button" onClick={() => toggleSort('turnover')}>Оборот{sortLabel(sort, 'turnover')}</button>
+              <i />
+            </div>
             <div className="budget-gift-list">
               {rows.map((item, index) => {
-                const itemStats = stats.get(item.name) ?? { floor: item.floorPrice ?? undefined, turnover: item.volume ?? undefined };
                 const selected = draft.nfts.includes(item.name);
                 return (
                   <button className="budget-gift-item" key={item.id || item.name} onClick={() => toggleGift(item.name)}>
@@ -98,8 +107,8 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
                       <b>{item.name}</b>
                       <small>{selected ? 'в поиске' : 'не выбран'}</small>
                     </span>
-                    <small className="floor">{formatTon(itemStats?.floor)}</small>
-                    <small className="floor hot">{formatTurnover(itemStats?.turnover)}</small>
+                    <small className="floor">{formatTon(item.floorPrice ?? undefined)}</small>
+                    <small className="floor hot">{formatTurnover(item.volume ?? undefined)}</small>
                     <i className={selected ? 'check active' : 'check'}>{selected ? '✓' : ''}</i>
                   </button>
                 );
@@ -114,17 +123,6 @@ export function BudgetSheet({ catalog, filters, listings, onClose, onApply }: Pr
       </section>
     </div>
   );
-}
-
-function giftStats(listings: Listing[]) {
-  const stats = new Map<string, GiftStats>();
-  for (const item of listings) {
-    const current = stats.get(item.collection_name) ?? {};
-    if (item.floor_price && (!current.floor || item.floor_price < current.floor)) current.floor = item.floor_price;
-    if (item.sales_count) current.turnover = (current.turnover ?? 0) + item.sales_count;
-    stats.set(item.collection_name, current);
-  }
-  return stats;
 }
 
 function giftScopeText(selected: string[], total: number) {
@@ -144,6 +142,25 @@ function formatTon(value?: number) {
 
 function formatTurnover(value?: number) {
   return value ? String(value) : '—';
+}
+
+function sortGifts(a: NftCatalogItem, b: NftCatalogItem, sort: SortState) {
+  if (sort.key === 'name') return a.name.localeCompare(b.name);
+  const aValue = sort.key === 'floor' ? a.floorPrice : a.volume;
+  const bValue = sort.key === 'floor' ? b.floorPrice : b.volume;
+  const aMissing = aValue === null || aValue === undefined;
+  const bMissing = bValue === null || bValue === undefined;
+  if (aMissing && bMissing) return a.name.localeCompare(b.name);
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  const diff = aValue - bValue;
+  if (diff === 0) return a.name.localeCompare(b.name);
+  return sort.direction === 'asc' ? diff : -diff;
+}
+
+function sortLabel(sort: SortState, key: SortKey) {
+  if (sort.key !== key) return '';
+  return sort.direction === 'asc' ? ' ↑' : ' ↓';
 }
 
 function priceOnly(value: string) {

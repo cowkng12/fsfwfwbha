@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
@@ -123,9 +124,7 @@ class ListingRepository:
         if filters.min_price is not None:
             where.append("price >= ?")
             params.append(filters.min_price)
-        max_price = get_settings().mrkt_max_price
-        if filters.max_price is not None:
-            max_price = min(max_price, filters.max_price)
+        max_price = filters.max_price if filters.max_price is not None else get_settings().mrkt_max_price
         where.append("price <= ?")
         params.append(max_price)
         self._append_catalog_collection_filter(where, params)
@@ -174,13 +173,24 @@ class ListingRepository:
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
 
-    def find_unnotified(self, limit: int = 5, first_seen_after: str | None = None) -> list[Listing]:
-        params: list[str | float | int] = [get_settings().mrkt_max_price]
+    def find_unnotified(
+        self,
+        limit: int = 5,
+        first_seen_after: str | None = None,
+        collection_names: list[str] | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> list[Listing]:
+        params: list[str | float | int] = [max_price or get_settings().mrkt_max_price]
         first_seen_filter = ""
         if first_seen_after:
             first_seen_filter = "AND first_seen_at >= ?"
             params.append(first_seen_after)
-        catalog_filter = self._catalog_collection_sql(params)
+        min_price_filter = ""
+        if min_price is not None:
+            min_price_filter = "AND price >= ?"
+            params.append(min_price)
+        catalog_filter = self._selected_collection_sql(collection_names, params) if collection_names else self._catalog_collection_sql(params)
         blocked_filter = self._blocked_model_sql(params)
         quality_filter = self._collection_quality_sql(params)
         with connect() as conn:
@@ -192,6 +202,7 @@ class ListingRepository:
                   AND price > 0
                   AND price <= ?
                   {first_seen_filter}
+                  {min_price_filter}
                   {catalog_filter}
                   {blocked_filter}
                   {quality_filter}
@@ -209,6 +220,7 @@ class ListingRepository:
                 LIMIT ?
                 """.format(
                     first_seen_filter=first_seen_filter,
+                    min_price_filter=min_price_filter,
                     catalog_filter=catalog_filter,
                     blocked_filter=blocked_filter,
                     quality_filter=quality_filter,
@@ -216,6 +228,14 @@ class ListingRepository:
                 (*params, limit),
             ).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
+
+    def _selected_collection_sql(self, collection_names: list[str] | None, params: list[str | float | int]) -> str:
+        names = [name.strip() for name in (collection_names or []) if name.strip()]
+        if not names:
+            return ""
+        placeholders = ",".join("?" for _ in names)
+        params.extend(names)
+        return f"AND collection_name IN ({placeholders})"
 
     def _append_blocked_model_filter(self, where: list[str], params: list[str | float | int]) -> None:
         blocked_filter = self._blocked_model_sql(params)
@@ -360,6 +380,116 @@ class ResearchRunRepository:
                 "INSERT INTO research_runs (source, status, message, created_at) VALUES (?, ?, ?, ?)",
                 (source, status, message, utc_now()),
             )
+
+
+class SearchPreferencesRepository:
+    DEFAULT_MAX_PRICE = 10.0
+
+    def get(self, user_id: int | str) -> dict:
+        with connect() as conn:
+            row = conn.execute("SELECT * FROM search_preferences WHERE user_id = ?", (str(user_id),)).fetchone()
+        if not row:
+            return self._default()
+        try:
+            filters = json.loads(row["filters_json"])
+        except json.JSONDecodeError:
+            filters = {}
+        return self._normalize(filters, updated_at=row["updated_at"])
+
+    def save(self, user_id: int | str, filters: dict) -> dict:
+        normalized = self._normalize(filters)
+        now = utc_now()
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO search_preferences (user_id, filters_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    filters_json=excluded.filters_json,
+                    updated_at=excluded.updated_at
+                """,
+                (str(user_id), json.dumps(normalized, ensure_ascii=False), now),
+            )
+        normalized["updated_at"] = now
+        return normalized
+
+    def active_targets(self) -> dict:
+        recipients = SubscriptionRepository().active_recipient_ids()
+        if not recipients:
+            return {"collection_names": default_collection_names(), "min_price": None, "max_price": get_settings().mrkt_research_max_price}
+        placeholders = ",".join("?" for _ in recipients)
+        with connect() as conn:
+            rows = conn.execute(
+                f"SELECT filters_json FROM search_preferences WHERE user_id IN ({placeholders})",
+                tuple(recipients),
+            ).fetchall()
+        collection_names: set[str] = set()
+        min_prices: list[float] = []
+        max_prices: list[float] = []
+        for row in rows:
+            try:
+                filters = self._normalize(json.loads(row["filters_json"]))
+            except json.JSONDecodeError:
+                continue
+            collection_names.update(filters["nfts"])
+            if filters["minPrice"]:
+                min_prices.append(float(filters["minPrice"]))
+            if filters["maxPrice"]:
+                max_prices.append(float(filters["maxPrice"]))
+        return {
+            "collection_names": sorted(collection_names) or default_collection_names(),
+            "min_price": min(min_prices) if min_prices else None,
+            "max_price": max(max_prices) if max_prices else get_settings().mrkt_research_max_price,
+        }
+
+    def _default(self) -> dict:
+        return {
+            "nfts": [],
+            "backdrops": [],
+            "models": [],
+            "symbols": [],
+            "number": "",
+            "minPrice": "",
+            "maxPrice": str(int(self.DEFAULT_MAX_PRICE)),
+            "updated_at": None,
+        }
+
+    def _normalize(self, filters: dict, updated_at: str | None = None) -> dict:
+        def names(key: str) -> list[str]:
+            value = filters.get(key)
+            if not isinstance(value, list):
+                return []
+            clean = []
+            for item in value:
+                if isinstance(item, str) and item.strip():
+                    clean.append(item.strip())
+            return list(dict.fromkeys(clean))[:200]
+
+        normalized = {
+            "nfts": names("nfts"),
+            "backdrops": names("backdrops"),
+            "models": names("models"),
+            "symbols": names("symbols"),
+            "number": str(filters.get("number") or "").strip()[:32],
+            "minPrice": self._price_text(filters.get("minPrice")),
+            "maxPrice": self._price_text(filters.get("maxPrice")),
+            "updated_at": updated_at,
+        }
+        return normalized
+
+    def _price_text(self, value: object) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip().replace(",", ".")
+        if not text:
+            return ""
+        try:
+            number = float(text)
+        except ValueError:
+            return ""
+        if number < 0:
+            return ""
+        return f"{number:.4f}".rstrip("0").rstrip(".")
 
 
 SUBSCRIPTION_PLANS = {

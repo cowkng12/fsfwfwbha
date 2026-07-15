@@ -119,6 +119,12 @@ def init_db() -> None:
                 provider_payment_charge_id TEXT,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS search_preferences (
+                user_id TEXT PRIMARY KEY,
+                filters_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         for statement in [

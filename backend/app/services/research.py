@@ -160,11 +160,20 @@ class ResearchService:
         self._priority_model_cache: dict[str, list[str]] = {}
         self._relaxed_model_cache: dict[str, list[str]] = {}
         self._model_sales_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        self._active_research_max_price: float | None = None
 
-    async def run(self, collection_names: list[str] | None = None) -> int:
+    async def run(
+        self,
+        collection_names: list[str] | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> int:
         async with self._lock:
             init_db()
             collections = collection_names or default_collection_names()
+            search_min_price = min_price
+            search_max_price = max_price or self.mrkt.settings.mrkt_research_max_price
+            self._active_research_max_price = search_max_price
             normalized: list[dict] = []
             telegram_client = await self._telegram_client()
             try:
@@ -172,7 +181,7 @@ class ResearchService:
                     if len(normalized) >= MAX_LISTINGS_PER_RUN:
                         break
                     try:
-                        gifts = await self._candidate_gifts(name)
+                        gifts = await self._candidate_gifts(name, search_min_price, search_max_price)
                         accepted_for_collection = 0
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
@@ -188,36 +197,43 @@ class ResearchService:
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
                 if not normalized:
-                    normalized.extend(await self._relaxed_listings(collections, telegram_client))
+                    normalized.extend(await self._relaxed_listings(collections, telegram_client, search_min_price, search_max_price))
             finally:
+                self._active_research_max_price = None
                 if telegram_client:
                     await telegram_client.disconnect()
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count
 
-    async def _candidate_gifts(self, collection: str) -> list[dict[str, Any]]:
-        max_price = self.mrkt.settings.mrkt_research_max_price
-        gifts = await self.mrkt.saling([collection], max_price=max_price)
+    async def _candidate_gifts(self, collection: str, min_price: float | None = None, max_price: float | None = None) -> list[dict[str, Any]]:
+        max_price = max_price or self.mrkt.settings.mrkt_research_max_price
+        gifts = await self.mrkt.saling([collection], min_price=min_price, max_price=max_price)
 
         model_names = await self._priority_model_names(collection)
         if model_names:
-            gifts.extend(await self._filtered_gifts(collection, "model", model_names, max_price))
+            gifts.extend(await self._filtered_gifts(collection, "model", model_names, min_price, max_price))
 
         if not collection_requires_priority_model(collection):
             backdrop_names = self._priority_backdrop_names()
             if backdrop_names:
-                gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
+                gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, min_price, max_price))
 
         return self._limit_candidate_gifts(self._dedupe_gifts(gifts), RAW_CANDIDATE_SCAN_LIMIT)
 
-    async def _relaxed_listings(self, collections: list[str], telegram_client: TelegramClient | None) -> list[dict]:
+    async def _relaxed_listings(
+        self,
+        collections: list[str],
+        telegram_client: TelegramClient | None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> list[dict]:
         normalized: list[dict] = []
         for name in collections:
             if len(normalized) >= MAX_LISTINGS_PER_RUN:
                 break
             try:
-                gifts = await self._relaxed_candidate_gifts(name)
+                gifts = await self._relaxed_candidate_gifts(name, min_price, max_price)
                 accepted_for_collection = 0
                 for gift in gifts:
                     listing = await self._normalize_gift(gift, name)
@@ -285,17 +301,17 @@ class ResearchService:
         summary["rejections"] = dict(sorted(rejection_counts.items(), key=lambda row: row[1], reverse=True))
         return summary
 
-    async def _relaxed_candidate_gifts(self, collection: str) -> list[dict[str, Any]]:
-        max_price = self.mrkt.settings.mrkt_research_max_price
-        gifts = await self.mrkt.saling([collection], max_price=max_price)
+    async def _relaxed_candidate_gifts(self, collection: str, min_price: float | None = None, max_price: float | None = None) -> list[dict[str, Any]]:
+        max_price = max_price or self.mrkt.settings.mrkt_research_max_price
+        gifts = await self.mrkt.saling([collection], min_price=min_price, max_price=max_price)
 
         model_names = await self._relaxed_model_names(collection)
         if model_names:
-            gifts.extend(await self._filtered_gifts(collection, "model", model_names, max_price))
+            gifts.extend(await self._filtered_gifts(collection, "model", model_names, min_price, max_price))
 
         backdrop_names = self._priority_backdrop_names()
         if backdrop_names:
-            gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, max_price))
+            gifts.extend(await self._filtered_gifts(collection, "backdrop", backdrop_names, min_price, max_price))
 
         return self._limit_candidate_gifts(self._dedupe_gifts(gifts), RAW_CANDIDATE_SCAN_LIMIT)
 
@@ -355,31 +371,33 @@ class ResearchService:
         ordered.extend(name for key, name in premium.items() if key not in {item.lower() for item in ordered})
         return ordered[:PRIORITY_BACKDROP_SCAN_LIMIT]
 
-    async def _filtered_gifts(self, collection: str, kind: str, names: list[str], max_price: float) -> list[dict[str, Any]]:
+    async def _filtered_gifts(self, collection: str, kind: str, names: list[str], min_price: float | None, max_price: float) -> list[dict[str, Any]]:
         gifts: list[dict[str, Any]] = []
         for batch in self._chunks(names, PRIORITY_FILTER_BATCH_SIZE):
             try:
-                gifts.extend(await self._saling_by_filter(collection, kind, batch, max_price))
+                gifts.extend(await self._saling_by_filter(collection, kind, batch, min_price, max_price))
             except Exception:
                 for name in batch:
                     try:
-                        gifts.extend(await self._saling_by_filter(collection, kind, [name], max_price))
+                        gifts.extend(await self._saling_by_filter(collection, kind, [name], min_price, max_price))
                     except Exception:
                         continue
         return gifts
 
-    async def _saling_by_filter(self, collection: str, kind: str, names: list[str], max_price: float) -> list[dict[str, Any]]:
+    async def _saling_by_filter(self, collection: str, kind: str, names: list[str], min_price: float | None, max_price: float) -> list[dict[str, Any]]:
         if kind == "model":
             return await self.mrkt.saling(
                 [collection],
                 model_names=names,
                 count=PRIORITY_FILTER_RESULT_COUNT,
+                min_price=min_price,
                 max_price=max_price,
             )
         return await self.mrkt.saling(
             [collection],
             backdrop_names=names,
             count=PRIORITY_FILTER_RESULT_COUNT,
+            min_price=min_price,
             max_price=max_price,
         )
 
@@ -472,7 +490,7 @@ class ResearchService:
             return False
         if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
             return False
-        if listing["price"] > self.mrkt.settings.mrkt_research_max_price:
+        if listing["price"] > self._effective_research_max_price():
             return False
         if has_collection_quality_rules(listing.get("collection_name")):
             return has_collection_specific_quality(
@@ -502,7 +520,7 @@ class ResearchService:
             return False
         if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
             return False
-        if listing["price"] > self.mrkt.settings.mrkt_research_max_price:
+        if listing["price"] > self._effective_research_max_price():
             return False
         premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
         backdrop = str(listing.get("backdrop_name") or "").lower()
@@ -511,6 +529,9 @@ class ResearchService:
             listing.get("backdrop_name"),
         )
         return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True)
+
+    def _effective_research_max_price(self) -> float:
+        return self._active_research_max_price or self.mrkt.settings.mrkt_research_max_price
 
     def _has_liquidity_signal(self, listing: dict, relaxed: bool = False) -> bool:
         model_floor = listing.get("model_floor_price")

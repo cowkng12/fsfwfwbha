@@ -299,12 +299,26 @@ class TelegramBotService:
     async def send_not_whitelisted(self, chat_id: int) -> None:
         await self._post("sendMessage", {"chat_id": chat_id, "text": WHITELIST_DENIED_MESSAGE})
 
-    async def send_new_listing_alerts(self, repo: ListingRepository, limit: int = 15, first_seen_after: str | None = None) -> int:
+    async def send_new_listing_alerts(
+        self,
+        repo: ListingRepository,
+        limit: int = 15,
+        first_seen_after: str | None = None,
+        collection_names: list[str] | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> int:
         recipients = SubscriptionRepository().active_recipient_ids()
         if not recipients:
             return 0
         sent = 0
-        for listing in repo.find_unnotified(limit, first_seen_after=first_seen_after):
+        for listing in repo.find_unnotified(
+            limit,
+            first_seen_after=first_seen_after,
+            collection_names=collection_names,
+            min_price=min_price,
+            max_price=max_price,
+        ):
             delivered = False
             try:
                 for chat_id in recipients:

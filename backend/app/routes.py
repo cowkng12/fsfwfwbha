@@ -17,11 +17,12 @@ from app.catalog import (
     is_priority_collection_model,
 )
 from app.config import get_settings
-from app.repositories import ListingRepository, SubscriptionRepository
+from app.repositories import ListingRepository, SearchPreferencesRepository, SubscriptionRepository
 from app.schemas import (
     FilterRequest,
     Listing,
     ResultsResponse,
+    SearchPreferences,
     SubscriptionInvoiceRequest,
     SubscriptionInvoiceResponse,
     SubscriptionStatus,
@@ -43,6 +44,10 @@ def parse_multi(value: list[str] | None) -> list[str]:
 
 def listing_repo() -> ListingRepository:
     return ListingRepository()
+
+
+def search_preferences_repo() -> SearchPreferencesRepository:
+    return SearchPreferencesRepository()
 
 
 def research_service() -> ResearchService:
@@ -350,6 +355,23 @@ def subscription_status(user_id: int = Depends(require_telegram_user_id)):
     return SubscriptionRepository().get(user_id)
 
 
+@router.get("/search-preferences", response_model=SearchPreferences)
+def search_preferences(
+    user_id: int = Depends(require_telegram_user_id),
+    repo: SearchPreferencesRepository = Depends(search_preferences_repo),
+):
+    return repo.get(user_id)
+
+
+@router.put("/search-preferences", response_model=SearchPreferences)
+def save_search_preferences(
+    request: SearchPreferences,
+    user_id: int = Depends(require_active_subscription),
+    repo: SearchPreferencesRepository = Depends(search_preferences_repo),
+):
+    return repo.save(user_id, request.model_dump(exclude={"updated_at"}))
+
+
 @router.post("/subscription/invoice", response_model=SubscriptionInvoiceResponse)
 async def subscription_invoice(
     request: SubscriptionInvoiceRequest,
@@ -412,6 +434,7 @@ def clear_listings(
 @router.get("/debug/mrkt")
 async def debug_mrkt(client=Depends(mrkt_client)):
     settings = client.settings
+    targets = SearchPreferencesRepository().active_targets()
     result = {
         "has_telegram_api_id": bool(settings.telegram_api_id),
         "has_telegram_api_hash": bool(settings.telegram_api_hash),
@@ -423,6 +446,12 @@ async def debug_mrkt(client=Depends(mrkt_client)):
         "mrkt_max_model_rarity": settings.mrkt_max_model_rarity,
         "mrkt_max_backdrop_rarity": settings.mrkt_max_backdrop_rarity,
         "mrkt_model_sales_max_age_days": settings.mrkt_model_sales_max_age_days,
+        "active_search_targets": {
+            "collection_count": len(targets["collection_names"]),
+            "collection_sample": targets["collection_names"][:12],
+            "min_price": targets["min_price"],
+            "max_price": targets["max_price"],
+        },
     }
     try:
         token = await client.token()
