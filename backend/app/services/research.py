@@ -117,6 +117,20 @@ COLOR_KEYWORDS: dict[str, set[str]] = {
     "orange": {"orange", "sunset", "peach", "coral"},
     "white": {"white", "pearl"},
 }
+COLOR_COMPATIBILITY: dict[str, set[str]] = {
+    "black": {"black", "white", "silver", "red", "gold", "blue", "purple"},
+    "white": {"white", "black", "silver", "gold", "blue", "red"},
+    "silver": {"silver", "white", "black", "blue", "purple"},
+    "gold": {"gold", "black", "white", "brown", "red"},
+    "red": {"red", "black", "white", "gold", "pink", "orange"},
+    "green": {"green", "black", "white", "cyan"},
+    "blue": {"blue", "black", "white", "silver", "cyan", "purple"},
+    "purple": {"purple", "black", "white", "blue", "pink"},
+    "pink": {"pink", "white", "red", "purple"},
+    "cyan": {"cyan", "blue", "green", "white", "silver"},
+    "orange": {"orange", "red", "gold", "brown"},
+    "brown": {"brown", "gold", "orange", "black"},
+}
 
 
 class GiftTableParser(HTMLParser):
@@ -511,9 +525,12 @@ class ResearchService:
         has_rare_model = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity)
         has_harmony = self._has_color_harmony(listing.get("model_name"), listing.get("backdrop_name"))
-        if listing["price"] <= self.mrkt.settings.mrkt_max_price and has_harmony and self._has_liquidity_signal(listing, relaxed=True):
-            return True
-        return has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
+        if not has_harmony:
+            return False
+        has_value_signal = has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
+        has_liquidity = self._has_liquidity_signal(listing)
+        has_relaxed_deal = listing["price"] <= self.mrkt.settings.mrkt_max_price and self._has_liquidity_signal(listing, relaxed=True)
+        return has_value_signal and (has_liquidity or has_relaxed_deal)
 
     def _is_relaxed_quality_listing(self, listing: dict) -> bool:
         if not listing.get("image_url") or not listing.get("price"):
@@ -522,9 +539,7 @@ class ResearchService:
             return False
         if listing["price"] > self._effective_research_max_price():
             return False
-        premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
-        backdrop = str(listing.get("backdrop_name") or "").lower()
-        has_visual_signal = backdrop in premium_backdrops or self._has_color_harmony(
+        has_visual_signal = self._has_color_harmony(
             listing.get("model_name"),
             listing.get("backdrop_name"),
         )
@@ -551,7 +566,12 @@ class ResearchService:
         backdrop_palette = self._palette_for_backdrop(backdrop_name)
         if not model_palette or not backdrop_palette:
             return False
-        return bool(model_palette & backdrop_palette)
+        if model_palette & backdrop_palette:
+            return True
+        for color in model_palette:
+            if COLOR_COMPATIBILITY.get(color, set()) & backdrop_palette:
+                return True
+        return False
 
     def _quality_rejection_reasons(self, listing: dict) -> list[str]:
         reasons: list[str] = []
