@@ -184,8 +184,8 @@ class ListingRepository:
         params: list[str | float | int] = [max_price or get_settings().mrkt_max_price]
         first_seen_filter = ""
         if first_seen_after:
-            first_seen_filter = "AND (first_seen_at >= ? OR updated_at >= ?)"
-            params.extend([first_seen_after, first_seen_after])
+            first_seen_filter = "AND first_seen_at >= ?"
+            params.append(first_seen_after)
         min_price_filter = ""
         if min_price is not None:
             min_price_filter = "AND price >= ?"
