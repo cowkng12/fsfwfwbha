@@ -63,6 +63,9 @@ class TelegramBotService:
         if not chat_id:
             return
         user_id = (message.get("from") or {}).get("id")
+        if text.startswith("/start"):
+            await self.send_start(chat_id, user_id)
+            return
         if not self._is_allowed(chat_id, user_id):
             logger.info("Ignoring Telegram update from non-whitelisted chat=%s user=%s", chat_id, user_id)
             await self.send_not_whitelisted(chat_id)
@@ -79,8 +82,6 @@ class TelegramBotService:
         if text.startswith("/testalert"):
             await self.handle_test_alert_command(chat_id, user_id)
             return
-        if text.startswith("/start"):
-            await self.send_start(chat_id)
 
     async def create_subscription_invoice(self, user_id: int, plan: dict) -> str:
         payload = f"subscription:{user_id}:{plan['id']}:{int(datetime.now(timezone.utc).timestamp())}"
@@ -303,22 +304,33 @@ class TelegramBotService:
         except Exception as exc:
             logger.info("Cannot notify revoked user %s: %s", user_id, exc)
 
-    async def send_start(self, chat_id: int) -> None:
+    async def send_start(self, chat_id: int, user_id: int | None = None) -> None:
         app_url = (self.settings.public_base_url or "").rstrip("/")
-        text = (
-            "<b>PRIVATE FLIP запущен</b>\n\n"
-            "Я присылаю новые MRKT-листинги Telegram-подарков. "
-            "Открой Mini App, чтобы смотреть найденные слоты."
+        status = SubscriptionRepository().get(user_id or chat_id)
+        bot_name = "FloorHunt"
+        subscription_text = (
+            "\n\n<b>Подписка активна.</b> Можешь открывать мини-апп и настраивать поиск."
+            if status.get("active")
+            else "\n\nЧтобы получить доступ к боту, вам надо купить подписку."
         )
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "reply_markup": {
-                "inline_keyboard": [[{"text": "Открыть Mini App", "web_app": {"url": app_url}}]]
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": (
+                    f'<b>Добро пожаловать в "{escape(bot_name)}"</b>\n\n'
+                    "Этот бот мониторит MRKT и ищет потенциально выгодные Telegram-подарки: "
+                    "редкие модели, удачные фоны, свежие листинги и лоты в выбранном бюджете. "
+                    "В мини-аппе можно выбрать подарки для поиска и настроить диапазон цены."
+                    f"{subscription_text}"
+                ),
+                "parse_mode": "HTML",
+                "reply_markup": {
+                    "inline_keyboard": [[{"text": "Перейти в бота", "web_app": {"url": app_url}}]]
+                },
             },
-        }
-        await self._post("sendMessage", payload)
+        )
+        return
 
     async def send_subscribe(self, chat_id: int) -> None:
         app_url = (self.settings.public_base_url or "").rstrip("/")
