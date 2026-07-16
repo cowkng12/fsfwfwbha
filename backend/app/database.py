@@ -17,12 +17,15 @@ def database_path() -> Path:
     path = Path(raw_path)
     if url == DEFAULT_DATABASE_URL or not path.is_absolute():
         persistent_path = _persistent_database_path()
-        if persistent_path:
-            persistent_path.parent.mkdir(parents=True, exist_ok=True)
+        if persistent_path and _prepare_database_parent(persistent_path):
             return persistent_path
     if not path.is_absolute():
         path = Path(__file__).parents[1] / path
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not _prepare_database_parent(path):
+        fallback_path = Path(__file__).parents[1] / "data" / DATABASE_FILENAME
+        if path != fallback_path and _prepare_database_parent(fallback_path):
+            return fallback_path
+        raise PermissionError(f"Cannot create SQLite database directory: {path.parent}")
     return path
 
 
@@ -52,7 +55,7 @@ def _persistent_database_path() -> Path | None:
     if root:
         return root / DATABASE_FILENAME
     render_disk = Path("/var/data")
-    if render_disk.exists() or os.environ.get("RENDER"):
+    if render_disk.exists():
         return render_disk / DATABASE_FILENAME
     data_disk = Path("/data")
     if data_disk.exists():
@@ -81,6 +84,14 @@ def _persistent_root_for_path(path: Path) -> Path | None:
 def _env_path(key: str) -> Path | None:
     value = os.environ.get(key)
     return Path(value) if value else None
+
+
+def _prepare_database_parent(path: Path) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
+    return os.access(path.parent, os.W_OK)
 
 
 @contextmanager
