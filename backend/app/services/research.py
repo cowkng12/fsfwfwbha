@@ -148,6 +148,12 @@ COLOR_SOFT_COMPATIBILITY: dict[str, set[str]] = {
     "orange": {"gold"},
     "brown": {"gold"},
 }
+CLASHY_ACCENTS_ON_BACKDROP: dict[str, dict[str, set[str]]] = {
+    "green": {
+        "backdrops": {"gold", "orange", "brown"},
+        "accents": {"red", "orange"},
+    },
+}
 
 
 class GiftTableParser(HTMLParser):
@@ -656,6 +662,8 @@ class ResearchService:
         backdrop_palette = set(backdrop_palette or []) or self._palette_for_backdrop(backdrop_name)
         if not model_palette or not backdrop_palette:
             return False
+        if self._has_color_clash(model_palette, backdrop_palette):
+            return False
         if model_palette & backdrop_palette:
             return True
         for color in model_palette:
@@ -676,8 +684,16 @@ class ResearchService:
         backdrop_palette = set(backdrop_palette or []) or self._palette_for_backdrop(backdrop_name)
         if not model_palette or not backdrop_palette:
             return False
+        if self._has_color_clash(model_palette, backdrop_palette):
+            return False
         for color in model_palette:
             if COLOR_SOFT_COMPATIBILITY.get(color, set()) & backdrop_palette:
+                return True
+        return False
+
+    def _has_color_clash(self, model_palette: set[str], backdrop_palette: set[str]) -> bool:
+        for base_color, rule in CLASHY_ACCENTS_ON_BACKDROP.items():
+            if base_color in model_palette and rule["backdrops"] & backdrop_palette and rule["accents"] & model_palette:
                 return True
         return False
 
@@ -722,6 +738,8 @@ class ResearchService:
             listing.get("backdrop_palette"),
         )
         has_liquidity = self._has_liquidity_signal(listing, relaxed=True)
+        if self._has_color_clash(set(listing.get("model_palette") or []), set(listing.get("backdrop_palette") or [])):
+            reasons.append("color_clash")
         if not has_harmony:
             reasons.append("no_color_harmony")
         if not has_soft_harmony:
@@ -744,6 +762,7 @@ class ResearchService:
             "backdrop_rarity": listing.get("backdrop_rarity"),
             "model_palette": listing.get("model_palette"),
             "backdrop_palette": listing.get("backdrop_palette"),
+            "color_clash": self._has_color_clash(set(listing.get("model_palette") or []), set(listing.get("backdrop_palette") or [])),
             "harmony": self._has_color_harmony(
                 listing.get("model_name"),
                 listing.get("backdrop_name"),
