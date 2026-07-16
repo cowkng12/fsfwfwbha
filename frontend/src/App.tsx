@@ -53,7 +53,14 @@ export function App() {
     fetchSubscription().then(setSubscription).catch((error) => console.error(error));
     fetchSearchPreferences()
       .then((saved) => {
-        if (saved.updated_at) setFilters(normalizeFilters(saved));
+        if (saved.updated_at) {
+          setFilters(normalizeFilters(saved));
+          return;
+        }
+        const stored = readStoredFilters();
+        if (hasSavedSearchIntent(stored)) {
+          saveSearchPreferences(stored).catch((error) => console.error(error));
+        }
       })
       .catch((error) => console.error(error));
   }, []);
@@ -239,6 +246,18 @@ function normalizeFilters(value: Partial<FilterState> | null | undefined): Filte
     minPrice: value?.minPrice ?? '',
     maxPrice: value?.maxPrice || DEFAULT_BUDGET,
   };
+}
+
+function hasSavedSearchIntent(filters: FilterState) {
+  return Boolean(
+    filters.nfts.length
+    || filters.backdrops.length
+    || filters.models.length
+    || filters.symbols.length
+    || filters.number
+    || filters.minPrice
+    || (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET),
+  );
 }
 
 function SubscriptionSheet({
