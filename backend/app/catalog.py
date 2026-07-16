@@ -87,6 +87,10 @@ def default_collection_names() -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def primary_collection_names() -> list[str]:
+    return [item["name"] for item in get_catalog()["nfts"] if item.get("name")]
+
+
 def canonical_collection_name(collection_name: str | None) -> str:
     normalized = _normalize_name(collection_name)
     for item in get_catalog()["nfts"]:
