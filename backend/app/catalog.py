@@ -19,9 +19,6 @@ BLOCKED_COLLECTION_MODELS = {
     ("ice cream", "pine cone"),
     ("ice cream", "sushi"),
     ("ice cream", "ube cream"),
-    ("desk calendar", "strong circle"),
-    ("evil eye", "cirrus"),
-    ("jolly chimp", "cavegirl"),
 }
 COLLECTION_QUALITY_RULES = {
     "liberty figure": {

@@ -35,7 +35,7 @@ RAW_CANDIDATE_SCAN_LIMIT = 50
 ACCEPTED_LISTINGS_PER_COLLECTION = 3
 MAX_LISTINGS_PER_RUN = 25
 SIMILAR_LISTINGS_PER_COLLECTION = 1
-MAX_SIMILAR_LISTINGS_PER_RUN = 0
+MAX_SIMILAR_LISTINGS_PER_RUN = 2
 MODEL_SALE_SAMPLE_SIZE = 6
 MODEL_RECENT_SALES_LIMIT = 3
 COMBO_MARKET_MAX_PAGES = 3
@@ -125,17 +125,17 @@ COLOR_KEYWORDS: dict[str, set[str]] = {
 }
 COLOR_COMPATIBILITY: dict[str, set[str]] = {
     "black": {"black", "white", "silver", "red", "gold", "blue", "purple"},
-    "white": {"white", "black", "silver"},
-    "silver": {"silver", "white", "black", "blue"},
-    "gold": {"gold", "black", "white", "red"},
-    "red": {"red", "black", "white", "gold"},
+    "white": {"white", "black", "silver", "gold", "blue", "red"},
+    "silver": {"silver", "white", "black", "blue", "purple"},
+    "gold": {"gold", "black", "white", "brown", "red"},
+    "red": {"red", "black", "white", "gold", "pink", "orange"},
     "green": {"green", "black", "white", "cyan"},
-    "blue": {"blue", "black", "white", "silver", "cyan"},
-    "purple": {"purple", "black", "white"},
+    "blue": {"blue", "black", "white", "silver", "cyan", "purple"},
+    "purple": {"purple", "black", "white", "blue", "pink"},
     "pink": {"pink", "white", "red", "purple"},
     "cyan": {"cyan", "blue", "green", "white", "silver"},
-    "orange": {"orange", "red", "brown", "black"},
-    "brown": {"brown", "black"},
+    "orange": {"orange", "red", "gold", "brown"},
+    "brown": {"brown", "gold", "orange", "black"},
 }
 COLOR_SOFT_COMPATIBILITY: dict[str, set[str]] = {
     "black": {"green", "cyan"},
@@ -153,14 +153,6 @@ CLASHY_ACCENTS_ON_BACKDROP: dict[str, dict[str, set[str]]] = {
     "green": {
         "backdrops": {"gold", "orange", "brown"},
         "accents": {"red", "orange"},
-    },
-    "brown": {
-        "backdrops": {"gold", "orange", "brown"},
-        "accents": {"gold", "orange"},
-    },
-    "orange": {
-        "backdrops": {"gold", "orange", "brown"},
-        "accents": {"gold", "brown"},
     },
 }
 
@@ -1269,7 +1261,7 @@ class ResearchService:
             palette = {
                 family
                 for family, count in counts.items()
-                if count >= strongest * 0.35 or count / total >= 0.14
+                if count >= strongest * 0.18 or count / total >= 0.08
             }
         self._image_palette_cache[image_url] = palette
         return palette
