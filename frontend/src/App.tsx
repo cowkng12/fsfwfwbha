@@ -189,8 +189,8 @@ export function App() {
 
       <ResultGrid items={visibleItems} loading={loading} error={loadError} />
 
-      <footer className="footer-note">
-        {lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ожидание первого ресерча'}
+      <footer className="footer-note" hidden={!lastResearchAt}>
+        {lastResearchAt && `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}`}
       </footer>
 
       <div className="bottom-dock">
