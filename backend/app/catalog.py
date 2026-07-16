@@ -7,6 +7,15 @@ CATALOG_DIR = Path(__file__).parent / "catalogs"
 BLOCKED_COLLECTION_MODELS = {
     ("swiss watch", "gameboy"),
     ("smiss watch", "gameboy"),
+    ("vice cream", "pumpkin spice"),
+    ("vice cream", "sushi"),
+    ("vice cream", "ube cream"),
+    ("vicecream", "pumpkin spice"),
+    ("vicecream", "sushi"),
+    ("vicecream", "ube cream"),
+    ("ice cream", "pumpkin spice"),
+    ("ice cream", "sushi"),
+    ("ice cream", "ube cream"),
 }
 COLLECTION_QUALITY_RULES = {
     "liberty figure": {
