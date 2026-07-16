@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
-from app.catalog import blocked_collection_model_pairs, canonical_collection_name, collection_quality_rules, default_collection_names, primary_collection_names
+from app.catalog import blocked_collection_model_pairs, canonical_collection_name, collection_quality_rules, default_collection_names
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
@@ -416,7 +416,7 @@ class SearchPreferencesRepository:
     def active_targets(self) -> dict:
         preferences = self.active_recipient_preferences()
         if not preferences:
-            return {"collection_names": primary_collection_names(), "min_price": None, "max_price": get_settings().mrkt_research_max_price}
+            return {"collection_names": default_collection_names(), "min_price": None, "max_price": get_settings().mrkt_research_max_price}
         collection_names: set[str] = set()
         min_prices: list[float] = []
         max_prices: list[float] = []
@@ -427,7 +427,7 @@ class SearchPreferencesRepository:
             if item["max_price"] is not None:
                 max_prices.append(float(item["max_price"]))
         return {
-            "collection_names": sorted(collection_names) or primary_collection_names(),
+            "collection_names": sorted(collection_names) or default_collection_names(),
             "min_price": min(min_prices) if min_prices else None,
             "max_price": max(max_prices) if max_prices else get_settings().mrkt_research_max_price,
         }
@@ -457,7 +457,7 @@ class SearchPreferencesRepository:
         ]
 
     def _alert_filters(self, filters: dict) -> dict:
-        collection_names = filters.get("nfts") or primary_collection_names()
+        collection_names = filters.get("nfts") or default_collection_names()
         min_price = self._price_float(filters.get("minPrice"))
         max_price = self._price_float(filters.get("maxPrice")) or get_settings().mrkt_research_max_price
         return {
