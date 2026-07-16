@@ -36,6 +36,7 @@ ACCEPTED_LISTINGS_PER_COLLECTION = 3
 MAX_LISTINGS_PER_RUN = 25
 SIMILAR_LISTINGS_PER_COLLECTION = 1
 MAX_SIMILAR_LISTINGS_PER_RUN = 2
+MAX_BORDERLINE_TEST_LISTINGS_PER_RUN = 2
 MODEL_SALE_SAMPLE_SIZE = 6
 MODEL_RECENT_SALES_LIMIT = 3
 COMBO_MARKET_MAX_PAGES = 3
@@ -260,6 +261,8 @@ class ResearchService:
                         seen_ids.add(listing.get("external_id"))
                 if not normalized:
                     normalized.extend(await self._relaxed_listings(collections, telegram_client, search_min_price, search_max_price))
+                if not normalized:
+                    normalized.extend(await self._borderline_test_listings(collections, telegram_client, search_min_price, search_max_price))
             finally:
                 self._active_research_max_price = None
                 if telegram_client:
@@ -310,6 +313,35 @@ class ResearchService:
                             break
             except Exception as exc:
                 self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
+        return normalized
+
+    async def _borderline_test_listings(
+        self,
+        collections: list[str],
+        telegram_client: TelegramClient | None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+    ) -> list[dict]:
+        normalized: list[dict] = []
+        accepted_by_collection: dict[str, int] = {}
+        for name in collections:
+            if len(normalized) >= MAX_BORDERLINE_TEST_LISTINGS_PER_RUN:
+                break
+            try:
+                gifts = await self._candidate_gifts(name, min_price, max_price)
+                for gift in gifts:
+                    listing = await self._normalize_gift(gift, name)
+                    collection_key = self._collection_limit_key(listing, name)
+                    if self._is_borderline_test_listing(listing):
+                        if accepted_by_collection.get(collection_key, 0) >= SIMILAR_LISTINGS_PER_COLLECTION:
+                            continue
+                        await self._enrich_listing(listing, telegram_client)
+                        normalized.append(listing)
+                        accepted_by_collection[collection_key] = accepted_by_collection.get(collection_key, 0) + 1
+                        if len(normalized) >= MAX_BORDERLINE_TEST_LISTINGS_PER_RUN:
+                            break
+            except Exception as exc:
+                self.runs.add("mrkt", "error", f"{name} borderline: {exc}")
         return normalized
 
     async def debug_candidate_quality(self, collection_names: list[str] | None = None, sample_size: int = 8) -> dict[str, Any]:
@@ -649,6 +681,26 @@ class ResearchService:
             listing.get("model_palette"),
             listing.get("backdrop_palette"),
         ) and has_market_signal and has_deal_signal and self._has_liquidity_signal(listing, relaxed=True)
+
+    def _is_borderline_test_listing(self, listing: dict) -> bool:
+        if not listing.get("image_url") or not listing.get("price"):
+            return False
+        if is_blocked_collection_model(listing.get("collection_name"), listing.get("model_name")):
+            return False
+        if listing["price"] > self._effective_research_max_price():
+            return False
+        if has_collection_quality_rules(listing.get("collection_name")) and not has_collection_specific_quality(
+            listing.get("collection_name"),
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+        ):
+            return False
+        return self._has_color_harmony(
+            listing.get("model_name"),
+            listing.get("backdrop_name"),
+            listing.get("model_palette"),
+            listing.get("backdrop_palette"),
+        ) and self._has_liquidity_signal(listing, relaxed=True)
 
     def _effective_research_max_price(self) -> float:
         return self._active_research_max_price or self.mrkt.settings.mrkt_research_max_price
