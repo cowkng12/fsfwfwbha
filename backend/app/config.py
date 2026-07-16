@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     mrkt_api_url: str = "https://api.tgmrkt.io/api/v1"
     mrkt_max_price: float = 10
     mrkt_research_max_price: float = 10
-    mrkt_min_model_floor: float = 8
-    mrkt_max_model_rarity: float = 3
-    mrkt_max_backdrop_rarity: float = 3
+    mrkt_min_model_floor: float = 7.5
+    mrkt_max_model_rarity: float = 3.5
+    mrkt_max_backdrop_rarity: float = 3.5
     mrkt_model_sales_max_age_days: int = 7
     mrkt_min_gift_floor: float = 0
     mrkt_premium_backdrops: str = (
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         "Violet,White,Coral,Rose Gold,Peach,Teal,Navy Blue,Olive,Bronze,Lilac,Sea Foam,"
         "Cloud White,Sunset Orange"
     )
-    research_interval_seconds: int = 180
+    research_interval_seconds: int = 120
     keepalive_interval_seconds: int = 240
 
     telegram_api_id: int | None = None
