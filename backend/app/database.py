@@ -1,25 +1,86 @@
 import sqlite3
+import os
 from contextlib import contextmanager
 from pathlib import Path
 
 from app.config import get_settings
+
+DEFAULT_DATABASE_URL = "sqlite:///./data/app.sqlite3"
+DATABASE_FILENAME = "app.sqlite3"
 
 
 def database_path() -> Path:
     url = get_settings().database_url
     if not url.startswith("sqlite:///"):
         raise ValueError("Only sqlite:/// DATABASE_URL is supported by the bundled repository")
-    if url == "sqlite:///./data/app.sqlite3":
-        render_disk = Path("/var/data")
-        if render_disk.exists():
-            path = render_disk / "app.sqlite3"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            return path
-    path = Path(url.removeprefix("sqlite:///"))
+    raw_path = url.removeprefix("sqlite:///")
+    path = Path(raw_path)
+    if url == DEFAULT_DATABASE_URL or not path.is_absolute():
+        persistent_path = _persistent_database_path()
+        if persistent_path:
+            persistent_path.parent.mkdir(parents=True, exist_ok=True)
+            return persistent_path
     if not path.is_absolute():
         path = Path(__file__).parents[1] / path
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def database_storage_info() -> dict[str, object]:
+    path = database_path()
+    persistent_root = _persistent_root_for_path(path)
+    render = bool(os.environ.get("RENDER"))
+    is_mount = bool(persistent_root and persistent_root.exists() and os.path.ismount(persistent_root))
+    persistent_disk_active = bool(persistent_root and (is_mount or _persistent_root_from_env()))
+    return {
+        "database_path": str(path),
+        "persistent_root": str(persistent_root) if persistent_root else None,
+        "persistent_disk_active": persistent_disk_active,
+        "persistent_root_is_mount": is_mount,
+        "render_env_detected": render,
+        "database_url_is_default": get_settings().database_url == DEFAULT_DATABASE_URL,
+        "database_url_is_relative": not Path(get_settings().database_url.removeprefix("sqlite:///")).is_absolute(),
+        "warning": "SQLite is not using a persistent Render disk" if render and not persistent_disk_active else None,
+    }
+
+
+def _persistent_database_path() -> Path | None:
+    explicit_file = _env_path("DATABASE_FILE") or _env_path("SQLITE_PATH")
+    if explicit_file:
+        return explicit_file
+    root = _persistent_root_from_env()
+    if root:
+        return root / DATABASE_FILENAME
+    render_disk = Path("/var/data")
+    if render_disk.exists() or os.environ.get("RENDER"):
+        return render_disk / DATABASE_FILENAME
+    data_disk = Path("/data")
+    if data_disk.exists():
+        return data_disk / DATABASE_FILENAME
+    return None
+
+
+def _persistent_root_from_env() -> Path | None:
+    for key in ("DATABASE_PERSISTENT_DIR", "SQLITE_PERSISTENT_DIR", "RENDER_DISK_PATH", "RENDER_PERSISTENT_DIR"):
+        value = os.environ.get(key)
+        if value:
+            return Path(value)
+    return None
+
+
+def _persistent_root_for_path(path: Path) -> Path | None:
+    roots = [_persistent_root_from_env(), Path("/var/data"), Path("/data")]
+    normalized = str(path).replace("\\", "/")
+    for root in [item for item in roots if item]:
+        root_text = str(root).replace("\\", "/").rstrip("/")
+        if normalized == root_text or normalized.startswith(f"{root_text}/"):
+            return root
+    return None
+
+
+def _env_path(key: str) -> Path | None:
+    value = os.environ.get(key)
+    return Path(value) if value else None
 
 
 @contextmanager
