@@ -39,6 +39,10 @@ MAX_SIMILAR_LISTINGS_PER_RUN = 2
 MODEL_SALE_SAMPLE_SIZE = 6
 MODEL_RECENT_SALES_LIMIT = 3
 COMBO_MARKET_MAX_PAGES = 3
+STRICT_FLOOR_DISCOUNT = 0.95
+RELAXED_FLOOR_DISCOUNT = 0.93
+MIN_MODEL_EDGE = 1.08
+RELAXED_MODEL_EDGE = 1.12
 # Keep the most visually strong and color-harmony-friendly backdrops first.
 PRIORITY_BACKDROP_ORDER = [
     "Onyx Black",
@@ -566,7 +570,7 @@ class ResearchService:
                 listing.get("collection_name"),
                 listing.get("model_name"),
                 listing.get("backdrop_name"),
-            )
+            ) and self._has_deal_signal(listing)
         gift_floor = listing.get("floor_price")
         model_floor = listing.get("model_floor_price")
         model_rarity = listing.get("model_rarity")
@@ -589,8 +593,8 @@ class ResearchService:
             return False
         has_value_signal = has_premium_backdrop or has_expensive_model or has_rare_model or has_rare_backdrop
         has_liquidity = self._has_liquidity_signal(listing)
-        has_relaxed_deal = listing["price"] <= self.mrkt.settings.mrkt_max_price and self._has_liquidity_signal(listing, relaxed=True)
-        return has_value_signal and (has_liquidity or has_relaxed_deal)
+        has_deal = self._has_deal_signal(listing)
+        return has_value_signal and has_liquidity and has_deal
 
     def _is_relaxed_quality_listing(self, listing: dict) -> bool:
         if not listing.get("image_url") or not listing.get("price"):
@@ -605,7 +609,7 @@ class ResearchService:
             listing.get("model_palette"),
             listing.get("backdrop_palette"),
         )
-        return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True)
+        return has_visual_signal and self._has_liquidity_signal(listing, relaxed=True) and self._has_deal_signal(listing, relaxed=True)
 
     def _is_similar_quality_listing(self, listing: dict) -> bool:
         if not listing.get("image_url") or not listing.get("price"):
@@ -619,7 +623,7 @@ class ResearchService:
                 listing.get("collection_name"),
                 listing.get("model_name"),
                 listing.get("backdrop_name"),
-            )
+            ) and self._has_deal_signal(listing, relaxed=True)
         gift_floor = listing.get("floor_price")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
             return False
@@ -635,10 +639,10 @@ class ResearchService:
         has_expensive_model = bool(model_floor and model_floor >= model_floor_threshold)
         has_rare_model = bool(model_rarity and model_rarity <= rarity_threshold)
         has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity + 0.5)
-        has_floor_discount = bool(gift_floor and price and price <= gift_floor * 0.93)
-        has_relative_model_discount = bool(model_floor and price and model_floor >= price * 1.12)
+        has_floor_discount = bool(gift_floor and price and price <= gift_floor * RELAXED_FLOOR_DISCOUNT)
+        has_relative_model_discount = bool(model_floor and price and model_floor >= price * RELAXED_MODEL_EDGE)
         has_market_signal = any([has_premium_backdrop, has_expensive_model, has_rare_model, has_rare_backdrop])
-        has_deal_signal = any([has_floor_discount, has_relative_model_discount, has_rare_model, has_rare_backdrop])
+        has_deal_signal = has_floor_discount or has_relative_model_discount
         return self._has_soft_color_harmony(
             listing.get("model_name"),
             listing.get("backdrop_name"),
@@ -659,8 +663,19 @@ class ResearchService:
         has_model_floor = bool(model_floor and model_floor >= model_floor_threshold)
         has_model_rarity = bool(model_rarity and model_rarity <= self.mrkt.settings.mrkt_max_model_rarity + rarity_bonus)
         has_backdrop_rarity = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity + rarity_bonus)
-        has_floor_discount = bool(gift_floor and listing.get("price") and listing["price"] <= gift_floor * 0.95)
-        return has_model_floor or has_model_rarity or has_backdrop_rarity or has_floor_discount
+        return has_model_floor or has_model_rarity or has_backdrop_rarity
+
+    def _has_deal_signal(self, listing: dict, relaxed: bool = False) -> bool:
+        price = listing.get("price")
+        if not price:
+            return False
+        gift_floor = listing.get("floor_price")
+        model_floor = listing.get("model_floor_price")
+        floor_discount = RELAXED_FLOOR_DISCOUNT if relaxed else STRICT_FLOOR_DISCOUNT
+        model_edge = RELAXED_MODEL_EDGE if relaxed else MIN_MODEL_EDGE
+        has_floor_discount = bool(gift_floor and price <= gift_floor * floor_discount)
+        has_model_edge = bool(model_floor and model_floor >= price * model_edge)
+        return has_floor_discount or has_model_edge
 
     def _has_color_harmony(
         self,
@@ -749,6 +764,7 @@ class ResearchService:
             listing.get("backdrop_palette"),
         )
         has_liquidity = self._has_liquidity_signal(listing, relaxed=True)
+        has_deal = self._has_deal_signal(listing, relaxed=True)
         if self._has_color_clash(set(listing.get("model_palette") or []), set(listing.get("backdrop_palette") or [])):
             reasons.append("color_clash")
         if not has_harmony:
@@ -757,6 +773,8 @@ class ResearchService:
             reasons.append("no_soft_color_harmony")
         if not has_liquidity:
             reasons.append("no_liquidity_signal")
+        if not has_deal:
+            reasons.append("no_deal_signal")
         if not any([has_premium_backdrop, has_expensive_model, has_rare_model, has_rare_backdrop]):
             reasons.append("no_premium_or_rare_trait")
         return reasons or ["unknown"]
@@ -787,6 +805,7 @@ class ResearchService:
                 listing.get("backdrop_palette"),
             ),
             "liquidity": self._has_liquidity_signal(listing, relaxed=True),
+            "deal": self._has_deal_signal(listing, relaxed=True),
         }
 
     async def _enrich_listing(self, listing: dict, client: TelegramClient | None) -> None:
