@@ -8,7 +8,8 @@ from html import escape
 from PIL import Image, UnidentifiedImageError
 
 from app.config import Settings
-from app.repositories import ListingRepository, SubscriptionRepository
+from app.database import database_storage_info
+from app.repositories import ListingRepository, SearchPreferencesRepository, SubscriptionRepository
 from app.schemas import Listing
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,13 @@ class TelegramBotService:
         status = SubscriptionRepository().grant(target_user_id, days, granted_by=admin_user_id or chat_id)
         expires_at = status.get("expires_at")
         expires_text = "навсегда" if not expires_at else self._format_date(expires_at)
+        storage_warning = ""
+        if database_storage_info().get("warning"):
+            storage_warning = (
+                "\n\n<b>Внимание:</b> SQLite сейчас не на persistent disk. "
+                "После деплоя grant может слететь. Для постоянного доступа добавь ID в "
+                "<code>TELEGRAM_GRANTED_USER_IDS</code> или включи Render Disk."
+            )
         await self._post(
             "sendMessage",
             {
@@ -163,6 +171,7 @@ class TelegramBotService:
                     "<b>Доступ выдан</b>\n"
                     f"Пользователь: <code>{target_user_id}</code>\n"
                     f"Доступ: <b>{escape(expires_text)}</b>"
+                    f"{storage_warning}"
                 ),
                 "parse_mode": "HTML",
             },
@@ -338,8 +347,9 @@ class TelegramBotService:
         min_price: float | None = None,
         max_price: float | None = None,
     ) -> int:
-        recipients = SubscriptionRepository().active_recipient_ids()
-        if not recipients:
+        preferences_repo = SearchPreferencesRepository()
+        recipient_preferences = preferences_repo.active_recipient_preferences()
+        if not recipient_preferences:
             return 0
         sent = 0
         for listing in repo.find_unnotified(
@@ -349,9 +359,17 @@ class TelegramBotService:
             min_price=min_price,
             max_price=max_price,
         ):
+            matched_recipients = [
+                item["user_id"]
+                for item in recipient_preferences
+                if preferences_repo.matches_listing(listing, item)
+            ]
+            if not matched_recipients:
+                repo.mark_notified(listing.source, listing.external_id)
+                continue
             delivered = False
             try:
-                for chat_id in recipients:
+                for chat_id in matched_recipients:
                     await self.send_listing_alert(listing, chat_id=chat_id)
                     delivered = True
                 if delivered:

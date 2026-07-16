@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     telegram_alert_chat_id: str | None = None
     telegram_allowed_chat_ids: str | None = None
     telegram_allowed_user_ids: str | None = None
+    telegram_granted_user_ids: str | None = None
     telegram_webhook_secret: str | None = None
     public_base_url: str | None = None
     cron_secret: str | None = None
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
     @property
     def telegram_allowed_user_id_set(self) -> set[int]:
         return self._parse_int_set(self.telegram_allowed_user_ids)
+
+    @property
+    def telegram_granted_user_id_set(self) -> set[int]:
+        return self._parse_int_set(self.telegram_granted_user_ids)
 
     def _parse_int_set(self, value: str | None) -> set[int]:
         if not value:

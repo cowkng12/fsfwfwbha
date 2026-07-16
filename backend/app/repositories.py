@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
-from app.catalog import blocked_collection_model_pairs, collection_quality_rules, default_collection_names
+from app.catalog import blocked_collection_model_pairs, canonical_collection_name, collection_quality_rules, default_collection_names
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
@@ -414,33 +414,72 @@ class SearchPreferencesRepository:
         return normalized
 
     def active_targets(self) -> dict:
-        recipients = SubscriptionRepository().active_recipient_ids()
-        if not recipients:
+        preferences = self.active_recipient_preferences()
+        if not preferences:
             return {"collection_names": default_collection_names(), "min_price": None, "max_price": get_settings().mrkt_research_max_price}
-        placeholders = ",".join("?" for _ in recipients)
-        with connect() as conn:
-            rows = conn.execute(
-                f"SELECT filters_json FROM search_preferences WHERE user_id IN ({placeholders})",
-                tuple(recipients),
-            ).fetchall()
         collection_names: set[str] = set()
         min_prices: list[float] = []
         max_prices: list[float] = []
-        for row in rows:
-            try:
-                filters = self._normalize(json.loads(row["filters_json"]))
-            except json.JSONDecodeError:
-                continue
-            collection_names.update(filters["nfts"])
-            if filters["minPrice"]:
-                min_prices.append(float(filters["minPrice"]))
-            if filters["maxPrice"]:
-                max_prices.append(float(filters["maxPrice"]))
+        for item in preferences:
+            collection_names.update(item["collection_names"])
+            if item["min_price"] is not None:
+                min_prices.append(float(item["min_price"]))
+            if item["max_price"] is not None:
+                max_prices.append(float(item["max_price"]))
         return {
             "collection_names": sorted(collection_names) or default_collection_names(),
             "min_price": min(min_prices) if min_prices else None,
             "max_price": max(max_prices) if max_prices else get_settings().mrkt_research_max_price,
         }
+
+    def active_recipient_preferences(self) -> list[dict]:
+        recipients = SubscriptionRepository().active_recipient_ids()
+        if not recipients:
+            return []
+        placeholders = ",".join("?" for _ in recipients)
+        with connect() as conn:
+            rows = conn.execute(
+                f"SELECT user_id, filters_json, updated_at FROM search_preferences WHERE user_id IN ({placeholders})",
+                tuple(recipients),
+            ).fetchall()
+        saved: dict[str, dict] = {}
+        for row in rows:
+            try:
+                saved[str(row["user_id"])] = self._normalize(json.loads(row["filters_json"]), updated_at=row["updated_at"])
+            except json.JSONDecodeError:
+                continue
+        return [
+            {
+                "user_id": str(user_id),
+                **self._alert_filters(saved.get(str(user_id)) or self._default()),
+            }
+            for user_id in recipients
+        ]
+
+    def _alert_filters(self, filters: dict) -> dict:
+        collection_names = filters.get("nfts") or default_collection_names()
+        min_price = self._price_float(filters.get("minPrice"))
+        max_price = self._price_float(filters.get("maxPrice")) or get_settings().mrkt_research_max_price
+        return {
+            "collection_names": collection_names,
+            "collection_keys": {
+                self._collection_key(name)
+                for name in collection_names
+                if name
+            },
+            "min_price": min_price,
+            "max_price": max_price,
+        }
+
+    def matches_listing(self, listing: Listing, filters: dict) -> bool:
+        collection_key = self._collection_key(listing.collection_name)
+        if filters.get("collection_keys") and collection_key not in filters["collection_keys"]:
+            return False
+        if filters.get("min_price") is not None and listing.price < filters["min_price"]:
+            return False
+        if filters.get("max_price") is not None and listing.price > filters["max_price"]:
+            return False
+        return True
 
     def _default(self) -> dict:
         return {
@@ -490,6 +529,13 @@ class SearchPreferencesRepository:
         if number < 0:
             return ""
         return f"{number:.4f}".rstrip("0").rstrip(".")
+
+    def _price_float(self, value: object) -> float | None:
+        text = self._price_text(value)
+        return float(text) if text else None
+
+    def _collection_key(self, value: str | None) -> str:
+        return " ".join(canonical_collection_name(value).strip().lower().split())
 
 
 SUBSCRIPTION_PLANS = {
@@ -543,6 +589,16 @@ class SubscriptionRepository:
                 "updated_at": None,
                 "plans": self.plans(),
             }
+        if self.is_env_granted(user_id):
+            return {
+                "active": True,
+                "plan_id": "env_grant",
+                "status": "env_grant",
+                "started_at": None,
+                "expires_at": None,
+                "updated_at": None,
+                "plans": self.plans(),
+            }
         with connect() as conn:
             row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
         if not row:
@@ -566,9 +622,13 @@ class SubscriptionRepository:
         owner_ids = settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set
         return int(user_id) in owner_ids if str(user_id).isdigit() else False
 
+    def is_env_granted(self, user_id: int | str) -> bool:
+        return int(user_id) in get_settings().telegram_granted_user_id_set if str(user_id).isdigit() else False
+
     def active_recipient_ids(self) -> list[str]:
         settings = get_settings()
         recipients = {str(item) for item in (settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set)}
+        recipients.update(str(item) for item in settings.telegram_granted_user_id_set)
         if settings.telegram_alert_chat_id:
             recipients.add(str(settings.telegram_alert_chat_id))
         now = utc_now()

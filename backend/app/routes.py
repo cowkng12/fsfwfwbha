@@ -493,6 +493,7 @@ async def debug_tokens(
         "telegram_bot": {
             "configured": bool(service.settings.telegram_bot_token),
             "alert_chat_configured": bool(service.settings.telegram_alert_chat_id),
+            "env_granted_user_count": len(service.settings.telegram_granted_user_id_set),
         },
         "storage": {
             **database_storage_info(),
