@@ -34,7 +34,7 @@ RAW_CANDIDATE_SCAN_LIMIT = 40
 ACCEPTED_LISTINGS_PER_COLLECTION = 3
 MAX_LISTINGS_PER_RUN = 25
 SIMILAR_LISTINGS_PER_COLLECTION = 1
-MAX_SIMILAR_LISTINGS_PER_RUN = 5
+MAX_SIMILAR_LISTINGS_PER_RUN = 2
 MODEL_SALE_SAMPLE_SIZE = 6
 MODEL_RECENT_SALES_LIMIT = 3
 COMBO_MARKET_MAX_PAGES = 3
@@ -137,18 +137,16 @@ COLOR_COMPATIBILITY: dict[str, set[str]] = {
     "brown": {"brown", "gold", "orange", "black"},
 }
 COLOR_SOFT_COMPATIBILITY: dict[str, set[str]] = {
-    "black": {"green", "cyan", "orange", "pink"},
-    "white": {"green", "cyan", "purple", "pink", "orange"},
-    "silver": {"green", "cyan", "gold", "pink"},
-    "gold": {"orange", "brown", "green", "silver"},
-    "red": {"purple", "brown"},
+    "black": {"green", "cyan"},
+    "silver": {"green", "cyan", "gold"},
+    "gold": {"orange", "brown", "silver"},
+    "red": {"purple"},
     "green": {"blue", "gold", "silver"},
-    "blue": {"green", "gold"},
-    "purple": {"red", "gold", "silver"},
-    "pink": {"black", "silver", "orange"},
-    "cyan": {"black", "gold", "purple"},
-    "orange": {"black", "white", "pink"},
-    "brown": {"red", "silver"},
+    "blue": {"green"},
+    "purple": {"red", "gold"},
+    "cyan": {"black", "green"},
+    "orange": {"gold"},
+    "brown": {"gold"},
 }
 
 
@@ -608,12 +606,28 @@ class ResearchService:
         gift_floor = listing.get("floor_price")
         if self.mrkt.settings.mrkt_min_gift_floor and (not gift_floor or gift_floor < self.mrkt.settings.mrkt_min_gift_floor):
             return False
+        model_floor = listing.get("model_floor_price")
+        model_rarity = listing.get("model_rarity")
+        backdrop_rarity = listing.get("backdrop_rarity")
+        premium_backdrops = {name.lower() for name in self.mrkt.settings.premium_backdrop_list}
+        backdrop = str(listing.get("backdrop_name") or "").lower()
+        model_floor_threshold = max(5, self.mrkt.settings.mrkt_min_model_floor * 0.85)
+        rarity_threshold = self.mrkt.settings.mrkt_max_model_rarity + 0.5
+        price = listing.get("price")
+        has_premium_backdrop = backdrop in premium_backdrops
+        has_expensive_model = bool(model_floor and model_floor >= model_floor_threshold)
+        has_rare_model = bool(model_rarity and model_rarity <= rarity_threshold)
+        has_rare_backdrop = bool(backdrop_rarity and backdrop_rarity <= self.mrkt.settings.mrkt_max_backdrop_rarity + 0.5)
+        has_floor_discount = bool(gift_floor and price and price <= gift_floor * 0.93)
+        has_relative_model_discount = bool(model_floor and price and model_floor >= price * 1.12)
+        has_market_signal = any([has_premium_backdrop, has_expensive_model, has_rare_model, has_rare_backdrop])
+        has_deal_signal = any([has_floor_discount, has_relative_model_discount, has_rare_model, has_rare_backdrop])
         return self._has_soft_color_harmony(
             listing.get("model_name"),
             listing.get("backdrop_name"),
             listing.get("model_palette"),
             listing.get("backdrop_palette"),
-        ) and self._has_liquidity_signal(listing, relaxed=True)
+        ) and has_market_signal and has_deal_signal and self._has_liquidity_signal(listing, relaxed=True)
 
     def _effective_research_max_price(self) -> float:
         return self._active_research_max_price or self.mrkt.settings.mrkt_research_max_price
