@@ -87,6 +87,17 @@ def default_collection_names() -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def canonical_collection_name(collection_name: str | None) -> str:
+    normalized = _normalize_name(collection_name)
+    for item in get_catalog()["nfts"]:
+        if normalized == _normalize_name(item.get("name")):
+            return item["name"]
+        for alias in item.get("searchNames") or []:
+            if normalized == _normalize_name(alias):
+                return item["name"]
+    return collection_name or ""
+
+
 def blocked_collection_model_pairs() -> set[tuple[str, str]]:
     return BLOCKED_COLLECTION_MODELS
 

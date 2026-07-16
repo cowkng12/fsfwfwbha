@@ -15,6 +15,7 @@ from telethon.sessions import StringSession
 from telethon.tl import functions, types
 
 from app.catalog import (
+    canonical_collection_name,
     collection_requires_priority_model,
     default_collection_names,
     has_collection_quality_rules,
@@ -214,6 +215,8 @@ class ResearchService:
             self._active_research_max_price = search_max_price
             normalized: list[dict] = []
             similar_normalized: list[dict] = []
+            accepted_by_collection: dict[str, int] = {}
+            similar_by_collection: dict[str, int] = {}
             telegram_client = await self._telegram_client()
             try:
                 for name in collections:
@@ -221,24 +224,25 @@ class ResearchService:
                         break
                     try:
                         gifts = await self._candidate_gifts(name, search_min_price, search_max_price)
-                        accepted_for_collection = 0
-                        similar_for_collection = 0
                         for gift in gifts:
                             listing = await self._normalize_gift(gift, name)
+                            collection_key = self._collection_limit_key(listing, name)
                             if self._is_quality_listing(listing):
+                                if accepted_by_collection.get(collection_key, 0) >= ACCEPTED_LISTINGS_PER_COLLECTION:
+                                    continue
                                 await self._enrich_listing(listing, telegram_client)
                                 normalized.append(listing)
-                                accepted_for_collection += 1
-                                if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
+                                accepted_by_collection[collection_key] = accepted_by_collection.get(collection_key, 0) + 1
+                                if len(normalized) >= MAX_LISTINGS_PER_RUN:
                                     break
                             elif (
                                 len(similar_normalized) < MAX_SIMILAR_LISTINGS_PER_RUN
-                                and similar_for_collection < SIMILAR_LISTINGS_PER_COLLECTION
+                                and similar_by_collection.get(collection_key, 0) < SIMILAR_LISTINGS_PER_COLLECTION
                                 and self._is_similar_quality_listing(listing)
                             ):
                                 await self._enrich_listing(listing, telegram_client)
                                 similar_normalized.append(listing)
-                                similar_for_collection += 1
+                                similar_by_collection[collection_key] = similar_by_collection.get(collection_key, 0) + 1
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
                 if normalized and similar_normalized:
@@ -283,19 +287,22 @@ class ResearchService:
         max_price: float | None = None,
     ) -> list[dict]:
         normalized: list[dict] = []
+        accepted_by_collection: dict[str, int] = {}
         for name in collections:
             if len(normalized) >= MAX_LISTINGS_PER_RUN:
                 break
             try:
                 gifts = await self._relaxed_candidate_gifts(name, min_price, max_price)
-                accepted_for_collection = 0
                 for gift in gifts:
                     listing = await self._normalize_gift(gift, name)
+                    collection_key = self._collection_limit_key(listing, name)
                     if self._is_relaxed_quality_listing(listing):
+                        if accepted_by_collection.get(collection_key, 0) >= ACCEPTED_LISTINGS_PER_COLLECTION:
+                            continue
                         await self._enrich_listing(listing, telegram_client)
                         normalized.append(listing)
-                        accepted_for_collection += 1
-                        if accepted_for_collection >= ACCEPTED_LISTINGS_PER_COLLECTION or len(normalized) >= MAX_LISTINGS_PER_RUN:
+                        accepted_by_collection[collection_key] = accepted_by_collection.get(collection_key, 0) + 1
+                        if len(normalized) >= MAX_LISTINGS_PER_RUN:
                             break
             except Exception as exc:
                 self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
@@ -474,6 +481,10 @@ class ResearchService:
     def _gift_key(self, gift: dict[str, Any]) -> str:
         key = self._pick(gift, "id", "giftIdString", "giftId", "slug")
         return str(key or sha1(repr(gift).encode()).hexdigest())
+
+    def _collection_limit_key(self, listing: dict[str, Any], fallback_collection: str | None = None) -> str:
+        collection = str(listing.get("collection_name") or fallback_collection or "")
+        return self._normalize_name(canonical_collection_name(collection))
 
     async def _normalize_gift(self, gift: dict[str, Any], fallback_collection: str) -> dict:
         collection = self._deep_pick(gift, "collectionName", "collection", "collectionTitle", "giftName") or fallback_collection
