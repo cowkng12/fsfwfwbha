@@ -155,6 +155,12 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_listings_filters
             ON listings (collection_name, backdrop_name, model_name, price);
 
+            CREATE INDEX IF NOT EXISTS idx_listings_alert_scan
+            ON listings (notified_at, updated_at, first_seen_at, price);
+
+            CREATE INDEX IF NOT EXISTS idx_listings_updated_at
+            ON listings (updated_at);
+
             CREATE TABLE IF NOT EXISTS research_runs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source TEXT NOT NULL,
@@ -162,6 +168,9 @@ def init_db() -> None:
                 message TEXT,
                 created_at TEXT NOT NULL
             );
+
+            CREATE INDEX IF NOT EXISTS idx_research_runs_created_at
+            ON research_runs (created_at);
 
             CREATE TABLE IF NOT EXISTS notified_items (
                 source TEXT NOT NULL,

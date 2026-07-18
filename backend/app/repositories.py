@@ -353,6 +353,18 @@ class ListingRepository:
             conn.execute("DELETE FROM listings")
         return int(row["count"] if row else 0)
 
+    def prune_stale_listings(self, retention_hours: int) -> int:
+        if retention_hours <= 0:
+            return 0
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).isoformat()
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS count FROM listings WHERE updated_at < ?",
+                (cutoff,),
+            ).fetchone()
+            conn.execute("DELETE FROM listings WHERE updated_at < ?", (cutoff,))
+        return int(row["count"] if row else 0)
+
     def reset_alert_state(self) -> dict[str, int]:
         with connect() as conn:
             listing_count = conn.execute("SELECT COUNT(*) AS count FROM listings").fetchone()

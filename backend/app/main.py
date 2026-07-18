@@ -36,6 +36,7 @@ async def run_research_cycle() -> dict[str, int | bool | str | None]:
         if not alerts_ready:
             baseline_count = repo.mark_alert_baseline(first_seen_before=started_at)
             alerts_ready = True
+        pruned_count = repo.prune_stale_listings(settings.listings_retention_hours)
         targets = SearchPreferencesRepository().active_targets()
         try:
             stored = await research.run(
@@ -61,6 +62,7 @@ async def run_research_cycle() -> dict[str, int | bool | str | None]:
             return {
                 "stored": 0,
                 "sent": 0,
+                "pruned": pruned_count,
                 "baseline": baseline_count,
                 "alerts_ready": alerts_ready,
                 "paused": True,
@@ -74,7 +76,7 @@ async def run_research_cycle() -> dict[str, int | bool | str | None]:
             min_price=targets["min_price"],
             max_price=targets["max_price"],
         )
-        return {"stored": stored, "sent": sent, "baseline": baseline_count, "alerts_ready": alerts_ready}
+        return {"stored": stored, "sent": sent, "pruned": pruned_count, "baseline": baseline_count, "alerts_ready": alerts_ready}
 
 
 async def research_job() -> None:
