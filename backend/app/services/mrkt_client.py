@@ -12,6 +12,10 @@ from telethon.tl.functions.messages import RequestAppWebViewRequest
 from telethon.tl.types import InputBotAppShortName, InputPeerUser, InputUser
 
 from app.config import Settings
+from app.database import connect
+
+
+MRKT_AUTH_CACHE_KEY = "mrkt_auth_token"
 
 
 class MrktAuthError(RuntimeError):
@@ -44,8 +48,7 @@ class MrktClient:
             token = response.json().get("token")
         if not token:
             raise RuntimeError("MRKT auth did not return token")
-        self._token = token
-        self._cookie = f"access_token={token}"
+        self._set_token(token, persist=True)
         return token
 
     async def _fetch_init_data_from_telegram(self) -> str:
@@ -70,6 +73,9 @@ class MrktClient:
 
     async def token(self) -> str:
         self._raise_if_auth_blocked()
+        cached_token = self._load_persisted_token()
+        if cached_token and cached_token != self._token:
+            self._set_token(cached_token)
         return self._token or await self._fetch_token_from_telegram()
 
     async def saling(
@@ -120,9 +126,16 @@ class MrktClient:
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
             await self._wait_for_request_slot()
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
-            if response.status_code in {401, 403}:
-                self._token = None
-                self._cookie = None
+            if response.status_code == 401:
+                self._clear_token()
+                headers = self._headers(await self._fetch_token_from_telegram())
+                await self._wait_for_request_slot()
+                response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
+                if response.status_code in {401, 403}:
+                    self._clear_token()
+                    self._block_auth(f"MRKT saling rejected refreshed token with {response.status_code}: {response.text[:200]}")
+            if response.status_code == 403:
+                self._clear_token()
                 self._block_auth(f"MRKT saling rejected token with {response.status_code}: {response.text[:200]}")
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT saling failed {response.status_code}: {response.text[:300]}")
@@ -139,6 +152,7 @@ class MrktClient:
             "has_telegram_api_id": bool(self.settings.telegram_api_id),
             "has_telegram_api_hash": bool(self.settings.telegram_api_hash),
             "has_telegram_session": bool(self.settings.telegram_session),
+            "has_persisted_mrkt_token": bool(self._load_persisted_token()),
             "auth_cooldown_active": self.auth_cooldown_active,
             "auth_cooldown_until": self.auth_cooldown_until_iso,
             "auth_cooldown_reason": self._auth_blocked_reason,
@@ -189,8 +203,7 @@ class MrktClient:
                     token = response.json().get("token")
                     result["fresh_auth_token_returned"] = bool(token)
                     if token:
-                        self._token = token
-                        self._cookie = f"access_token={token}"
+                        self._set_token(token, persist=True)
                 else:
                     result["fresh_auth_error"] = response.text[:200]
             except Exception as exc:
@@ -204,9 +217,16 @@ class MrktClient:
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
             await self._wait_for_request_slot()
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
-            if response.status_code in {401, 403}:
-                self._token = None
-                self._cookie = None
+            if response.status_code == 401:
+                self._clear_token()
+                headers = self._headers(await self._fetch_token_from_telegram())
+                await self._wait_for_request_slot()
+                response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
+                if response.status_code in {401, 403}:
+                    self._clear_token()
+                    self._block_auth(f"MRKT {trait} rejected refreshed token with {response.status_code}: {response.text[:200]}")
+            if response.status_code == 403:
+                self._clear_token()
                 self._block_auth(f"MRKT {trait} rejected token with {response.status_code}: {response.text[:200]}")
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT {trait} failed {response.status_code}: {response.text[:300]}")
@@ -314,6 +334,48 @@ class MrktClient:
         self._auth_blocked_until = datetime.now(timezone.utc) + timedelta(seconds=seconds)
         self._auth_blocked_reason = reason
         raise MrktAuthError(reason, cooldown_until=self._auth_blocked_until)
+
+    def _set_token(self, token: str, persist: bool = False) -> None:
+        self._token = token
+        self._cookie = f"access_token={token}"
+        if persist:
+            self._save_persisted_token(token)
+
+    def _clear_token(self) -> None:
+        self._token = None
+        self._cookie = None
+        self._delete_persisted_token()
+
+    def _load_persisted_token(self) -> str | None:
+        try:
+            with connect() as conn:
+                row = conn.execute("SELECT value FROM auth_cache WHERE key = ?", (MRKT_AUTH_CACHE_KEY,)).fetchone()
+            return str(row["value"]) if row and row["value"] else None
+        except Exception:
+            return None
+
+    def _save_persisted_token(self, token: str) -> None:
+        try:
+            with connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO auth_cache (key, value, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        value=excluded.value,
+                        updated_at=excluded.updated_at
+                    """,
+                    (MRKT_AUTH_CACHE_KEY, token, datetime.now(timezone.utc).isoformat()),
+                )
+        except Exception:
+            pass
+
+    def _delete_persisted_token(self) -> None:
+        try:
+            with connect() as conn:
+                conn.execute("DELETE FROM auth_cache WHERE key = ?", (MRKT_AUTH_CACHE_KEY,))
+        except Exception:
+            pass
 
     async def _wait_for_request_slot(self) -> None:
         delay = max(0.0, float(self.settings.mrkt_request_delay_seconds or 0))

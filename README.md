@@ -34,6 +34,8 @@ Backend делает self-ping по `PUBLIC_BASE_URL` каждые `KEEPALIVE_IN
 
 Если MRKT возвращает `401` или `403` на авторизованные запросы, backend останавливает ресерч и ставит MRKT auth в cooldown на `MRKT_AUTH_COOLDOWN_SECONDS`, по умолчанию 6 часов. Это защищает Telegram-сессию и MRKT-токен от повторных автоматических auth-попыток. Между MRKT API запросами выдерживается пауза `MRKT_REQUEST_DELAY_SECONDS`, по умолчанию 1 секунда. `GET /api/debug/tokens` по умолчанию проверяет только текущий кэшированный токен; fresh-auth через Telegram запускается только явно: `GET /api/debug/tokens?refresh=true`.
 
+После успешного MRKT auth свежий токен сохраняется в SQLite `auth_cache`, поэтому переживает рестарты Render и может использоваться вместо устаревшего `MRKT_AUTH_TOKEN` из env. Если текущий токен протух и MRKT вернул `401`, backend один раз получает новый токен через действующую `TELEGRAM_SESSION`, сохраняет его и повторяет запрос. Если MRKT или Telegram-сессия отвечают запретом, требуется ручная замена `TELEGRAM_SESSION`/секретов в Render.
+
 ## API
 
 - `GET /api/health` - статус сервиса.
