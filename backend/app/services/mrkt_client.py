@@ -1,3 +1,5 @@
+import asyncio
+from datetime import datetime, timedelta, timezone
 from time import monotonic
 from urllib.parse import unquote
 
@@ -12,18 +14,32 @@ from telethon.tl.types import InputBotAppShortName, InputPeerUser, InputUser
 from app.config import Settings
 
 
+class MrktAuthError(RuntimeError):
+    def __init__(self, message: str, cooldown_until: datetime | None = None):
+        super().__init__(message)
+        self.cooldown_until = cooldown_until
+
+
 class MrktClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._token = settings.mrkt_auth_token
         self._cookie = f"access_token={settings.mrkt_auth_token}" if settings.mrkt_auth_token else None
         self._gift_collections_cache: tuple[float, list[dict]] | None = None
+        self._auth_blocked_until: datetime | None = None
+        self._auth_blocked_reason: str | None = None
+        self._request_lock = asyncio.Lock()
+        self._last_request_at = 0.0
 
     async def _fetch_token_from_telegram(self) -> str:
+        self._raise_if_auth_blocked()
         init_data = await self._fetch_init_data_from_telegram()
 
         async with AsyncSession(impersonate="chrome", timeout=30) as http:
+            await self._wait_for_request_slot()
             response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
+            if response.status_code in {401, 403}:
+                self._block_auth(f"MRKT auth rejected Telegram session with {response.status_code}: {response.text[:200]}")
             response.raise_for_status()
             token = response.json().get("token")
         if not token:
@@ -53,6 +69,7 @@ class MrktClient:
         return init_data
 
     async def token(self) -> str:
+        self._raise_if_auth_blocked()
         return self._token or await self._fetch_token_from_telegram()
 
     async def saling(
@@ -101,11 +118,12 @@ class MrktClient:
         )
         headers = self._headers(await self.token())
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
+            await self._wait_for_request_slot()
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
             if response.status_code in {401, 403}:
                 self._token = None
-                headers = self._headers(await self._fetch_token_from_telegram())
-                response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=headers, json=payload)
+                self._cookie = None
+                self._block_auth(f"MRKT saling rejected token with {response.status_code}: {response.text[:200]}")
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT saling failed {response.status_code}: {response.text[:300]}")
             response.raise_for_status()
@@ -115,17 +133,25 @@ class MrktClient:
                 raise RuntimeError(f"MRKT saling returned non-JSON {response.status_code}: {response.text[:300]}")
         return payload
 
-    async def token_diagnostics(self) -> dict:
+    async def token_diagnostics(self, refresh_auth: bool = False) -> dict:
         result: dict = {
             "has_mrkt_auth_token": bool(self.settings.mrkt_auth_token),
             "has_telegram_api_id": bool(self.settings.telegram_api_id),
             "has_telegram_api_hash": bool(self.settings.telegram_api_hash),
             "has_telegram_session": bool(self.settings.telegram_session),
+            "auth_cooldown_active": self.auth_cooldown_active,
+            "auth_cooldown_until": self.auth_cooldown_until_iso,
+            "auth_cooldown_reason": self._auth_blocked_reason,
         }
         payload = self._saling_payload(["Airplane"], count=1, max_price=self.settings.mrkt_research_max_price)
-        if self._token:
+        if self.auth_cooldown_active:
+            result["cached_token_ok"] = False
+            result["cached_token_status"] = None
+            result["cached_token_error"] = "MRKT auth is in cooldown"
+        elif self._token:
             try:
                 async with AsyncSession(impersonate="chrome", timeout=30) as http:
+                    await self._wait_for_request_slot()
                     response = await http.post(f"{self.settings.mrkt_api_url}/gifts/saling", headers=self._headers(self._token), json=payload)
                 result["cached_token_status"] = response.status_code
                 result["cached_token_ok"] = response.status_code < 400
@@ -137,6 +163,10 @@ class MrktClient:
         else:
             result["cached_token_ok"] = False
             result["cached_token_status"] = None
+
+        if not refresh_auth:
+            result["fresh_auth_skipped"] = True
+            return result
 
         init_data = ""
         try:
@@ -151,6 +181,7 @@ class MrktClient:
         if init_data:
             try:
                 async with AsyncSession(impersonate="chrome", timeout=30) as http:
+                    await self._wait_for_request_slot()
                     response = await http.post(f"{self.settings.mrkt_api_url}/auth", json={"data": init_data})
                 result["fresh_auth_status"] = response.status_code
                 result["fresh_auth_ok"] = response.status_code < 400
@@ -171,11 +202,12 @@ class MrktClient:
         headers = self._headers(await self.token())
         payload = {"collections": collection_names}
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
+            await self._wait_for_request_slot()
             response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
             if response.status_code in {401, 403}:
                 self._token = None
-                headers = self._headers(await self._fetch_token_from_telegram())
-                response = await http.post(f"{self.settings.mrkt_api_url}/gifts/{trait}", headers=headers, json=payload)
+                self._cookie = None
+                self._block_auth(f"MRKT {trait} rejected token with {response.status_code}: {response.text[:200]}")
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT {trait} failed {response.status_code}: {response.text[:300]}")
             response.raise_for_status()
@@ -189,6 +221,7 @@ class MrktClient:
         if self._gift_collections_cache and monotonic() - self._gift_collections_cache[0] < 300:
             return self._gift_collections_cache[1]
         async with AsyncSession(impersonate="chrome", timeout=45) as http:
+            await self._wait_for_request_slot()
             response = await http.get(f"{self.settings.mrkt_api_url}/gifts/collections", headers=self._public_headers())
             if response.status_code >= 400:
                 raise RuntimeError(f"MRKT gift collections failed {response.status_code}: {response.text[:300]}")
@@ -258,3 +291,36 @@ class MrktClient:
         if self._cookie:
             headers["cookie"] = self._cookie
         return headers
+
+    @property
+    def auth_cooldown_active(self) -> bool:
+        return bool(self._auth_blocked_until and datetime.now(timezone.utc) < self._auth_blocked_until)
+
+    @property
+    def auth_cooldown_until_iso(self) -> str | None:
+        return self._auth_blocked_until.isoformat() if self.auth_cooldown_active and self._auth_blocked_until else None
+
+    def _raise_if_auth_blocked(self) -> None:
+        if self.auth_cooldown_active:
+            raise MrktAuthError(
+                self._auth_blocked_reason or "MRKT auth is in cooldown",
+                cooldown_until=self._auth_blocked_until,
+            )
+        self._auth_blocked_until = None
+        self._auth_blocked_reason = None
+
+    def _block_auth(self, reason: str) -> None:
+        seconds = max(300, int(self.settings.mrkt_auth_cooldown_seconds or 0))
+        self._auth_blocked_until = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+        self._auth_blocked_reason = reason
+        raise MrktAuthError(reason, cooldown_until=self._auth_blocked_until)
+
+    async def _wait_for_request_slot(self) -> None:
+        delay = max(0.0, float(self.settings.mrkt_request_delay_seconds or 0))
+        if delay <= 0:
+            return
+        async with self._request_lock:
+            elapsed = monotonic() - self._last_request_at
+            if elapsed < delay:
+                await asyncio.sleep(delay - elapsed)
+            self._last_request_at = monotonic()

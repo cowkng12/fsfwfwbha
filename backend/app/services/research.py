@@ -25,7 +25,7 @@ from app.catalog import (
 )
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository
-from app.services.mrkt_client import MrktClient
+from app.services.mrkt_client import MrktAuthError, MrktClient
 
 PRIORITY_MODEL_SCAN_LIMIT = 96
 PRIORITY_BACKDROP_SCAN_LIMIT = 120
@@ -248,6 +248,8 @@ class ResearchService:
                                 await self._enrich_listing(listing, telegram_client)
                                 similar_normalized.append(listing)
                                 similar_by_collection[collection_key] = similar_by_collection.get(collection_key, 0) + 1
+                    except MrktAuthError:
+                        raise
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
                 if normalized and similar_normalized:
@@ -311,6 +313,8 @@ class ResearchService:
                         accepted_by_collection[collection_key] = accepted_by_collection.get(collection_key, 0) + 1
                         if len(normalized) >= MAX_LISTINGS_PER_RUN:
                             break
+            except MrktAuthError:
+                raise
             except Exception as exc:
                 self.runs.add("mrkt", "error", f"{name} relaxed: {exc}")
         return normalized
@@ -340,6 +344,8 @@ class ResearchService:
                         accepted_by_collection[collection_key] = accepted_by_collection.get(collection_key, 0) + 1
                         if len(normalized) >= MAX_BORDERLINE_TEST_LISTINGS_PER_RUN:
                             break
+            except MrktAuthError:
+                raise
             except Exception as exc:
                 self.runs.add("mrkt", "error", f"{name} borderline: {exc}")
         return normalized
@@ -394,6 +400,11 @@ class ResearchService:
                         example["relaxed_pass"] = relaxed_pass
                         example["reasons"] = [] if strict_pass or similar_pass or relaxed_pass else self._quality_rejection_reasons(listing)
                         item["examples"].append(example)
+            except MrktAuthError as exc:
+                item["error"] = str(exc)
+                summary["collections"].append(item)
+                summary["auth_cooldown_until"] = exc.cooldown_until.isoformat() if exc.cooldown_until else None
+                break
             except Exception as exc:
                 item["error"] = str(exc)
             summary["collections"].append(item)

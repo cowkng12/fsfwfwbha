@@ -486,6 +486,7 @@ async def debug_mrkt(client=Depends(mrkt_client)):
 
 @router.get("/debug/tokens")
 async def debug_tokens(
+    refresh: bool = Query(default=False),
     client=Depends(mrkt_client),
     service: TelegramBotService = Depends(telegram_bot_service),
 ):
@@ -498,7 +499,7 @@ async def debug_tokens(
         "storage": {
             **database_storage_info(),
         },
-        "mrkt": await client.token_diagnostics(),
+        "mrkt": await client.token_diagnostics(refresh_auth=refresh),
     }
     try:
         me = await service.get_me()

@@ -32,6 +32,8 @@ Telegram Mini App для подбора выгодных Telegram NFT-подар
 
 Backend делает self-ping по `PUBLIC_BASE_URL` каждые `KEEPALIVE_INTERVAL_SECONDS`, пока процесс уже запущен. Если Render-сервис все равно засыпает, добавьте внешний cron/uptime check каждые 3-5 минут. Самый легкий вариант для поддержания процесса живым: `GET https://fsfwfwbha-gtzl.onrender.com/api/health`. Вариант, который сразу запускает скан и алерты: `GET https://fsfwfwbha-gtzl.onrender.com/api/cron/research?secret=<CRON_SECRET>`.
 
+Если MRKT возвращает `401` или `403` на авторизованные запросы, backend останавливает ресерч и ставит MRKT auth в cooldown на `MRKT_AUTH_COOLDOWN_SECONDS`, по умолчанию 6 часов. Это защищает Telegram-сессию и MRKT-токен от повторных автоматических auth-попыток. Между MRKT API запросами выдерживается пауза `MRKT_REQUEST_DELAY_SECONDS`, по умолчанию 1 секунда. `GET /api/debug/tokens` по умолчанию проверяет только текущий кэшированный токен; fresh-auth через Telegram запускается только явно: `GET /api/debug/tokens?refresh=true`.
+
 ## API
 
 - `GET /api/health` - статус сервиса.

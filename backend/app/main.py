@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.database import init_db
 from app.repositories import ListingRepository, ResearchRunRepository, SearchPreferencesRepository, utc_now
 from app.routes import router
-from app.services.mrkt_client import MrktClient
+from app.services.mrkt_client import MrktAuthError, MrktClient
 from app.services.research import ResearchService
 from app.services.telegram_bot import TelegramBotService
 
@@ -24,10 +24,11 @@ telegram_bot = TelegramBotService(settings)
 scheduler = AsyncIOScheduler()
 alerts_ready = False
 cycle_lock = asyncio.Lock()
+last_mrkt_auth_alert_until: str | None = None
 
 
-async def run_research_cycle() -> dict[str, int | bool]:
-    global alerts_ready
+async def run_research_cycle() -> dict[str, int | bool | str | None]:
+    global alerts_ready, last_mrkt_auth_alert_until
     async with cycle_lock:
         started_at = utc_now()
         repo = ListingRepository()
@@ -36,11 +37,36 @@ async def run_research_cycle() -> dict[str, int | bool]:
             baseline_count = repo.mark_alert_baseline(first_seen_before=started_at)
             alerts_ready = True
         targets = SearchPreferencesRepository().active_targets()
-        stored = await research.run(
-            collection_names=targets["collection_names"],
-            min_price=targets["min_price"],
-            max_price=targets["max_price"],
-        )
+        try:
+            stored = await research.run(
+                collection_names=targets["collection_names"],
+                min_price=targets["min_price"],
+                max_price=targets["max_price"],
+            )
+        except MrktAuthError as exc:
+            cooldown_until = exc.cooldown_until.isoformat() if exc.cooldown_until else None
+            ResearchRunRepository().add("mrkt", "paused", f"auth cooldown: {exc}")
+            if cooldown_until != last_mrkt_auth_alert_until:
+                last_mrkt_auth_alert_until = cooldown_until
+                try:
+                    await telegram_bot.send_system_alert(
+                        "FloorHunt MRKT paused",
+                        (
+                            "MRKT rejected the auth token/session, so research was stopped "
+                            f"until {cooldown_until or 'manual restart'}. Check /api/debug/tokens before running cron again."
+                        ),
+                    )
+                except Exception as alert_exc:
+                    logger.warning("MRKT auth alert failed: %s", alert_exc)
+            return {
+                "stored": 0,
+                "sent": 0,
+                "baseline": baseline_count,
+                "alerts_ready": alerts_ready,
+                "paused": True,
+                "reason": "mrkt_auth_cooldown",
+                "cooldown_until": cooldown_until,
+            }
         sent = await telegram_bot.send_new_listing_alerts(
             repo,
             first_seen_after=started_at,

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     mrkt_max_backdrop_rarity: float = 3.5
     mrkt_model_sales_max_age_days: int = 7
     mrkt_min_gift_floor: float = 0
+    mrkt_auth_cooldown_seconds: int = 21600
+    mrkt_request_delay_seconds: float = 1.0
     mrkt_premium_backdrops: str = (
         "Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,"
         "Chestnut,Chocolate,Cobalt Blue,Copper,Crimson,Cyberpunk,Dark Green,Dark Lilac,"

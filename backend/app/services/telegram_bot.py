@@ -411,6 +411,18 @@ class TelegramBotService:
         if not listing.telegram_url:
             await self._send_listing_preview(listing, chat_id=chat_id)
 
+    async def send_system_alert(self, title: str, message: str) -> None:
+        if not self.settings.telegram_alert_chat_id:
+            return
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": self.settings.telegram_alert_chat_id,
+                "text": f"<b>{escape(title)}</b>\n{escape(message)}",
+                "parse_mode": "HTML",
+            },
+        )
+
     async def _send_listing_preview(self, listing: Listing, chat_id: str | int | None = None) -> None:
         if not listing.image_url:
             return
