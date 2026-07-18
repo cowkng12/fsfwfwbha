@@ -110,6 +110,7 @@ export function App() {
     .filter((value) => value.length > 0).length
     + [filters.number, filters.minPrice].filter(Boolean).length
     + (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET ? 1 : 0);
+  const activeNav = subscriptionOpen ? 'profile' : budgetOpen ? 'budget' : pickerOpen ? 'gift' : 'listing';
 
   const applyFilters = (nextFilters: FilterState) => {
     setFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
@@ -172,31 +173,74 @@ export function App() {
   return (
     <main className="app-shell">
       <section className="profile-card">
+        <div className="profile-top">
+          <div>
+            <small className="panel-kicker">FloorHunt</small>
+            <h1>Лоты</h1>
+          </div>
+          <button className="subscription-pill" onClick={() => {
+            setBudgetOpen(false);
+            setPickerOpen(false);
+            setSubscriptionOpen(true);
+          }}>
+            {subscription?.active ? 'Активна' : 'Доступ'}
+          </button>
+        </div>
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row"><span>{budgetSummary(filters)}</span></div>
-        <button className="subscription-button" onClick={() => setSubscriptionOpen(true)}>
-          Моя подписка
-          <span>{subscription?.active ? 'активна' : 'не активна'}</span>
-        </button>
+        <div className="budget-row">
+          <span>{budgetSummary(filters)}</span>
+          <small>{activeFilterCount ? `${activeFilterCount} фильтра` : 'Все подарки'}</small>
+        </div>
+        <label className="top-search">
+          <span>⌕</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
+        </label>
       </section>
 
-      <div className="section-head">
-        <div className="section-title">Листинг</div>
-        <button className="budget-button" onClick={() => setBudgetOpen(true)}>Бюджет</button>
-        <button className="picker-button" onClick={() => setPickerOpen(true)}>Подарок{activeFilterCount ? ` · ${activeFilterCount}` : ''}</button>
+      <div className="feed-head">
+        <span>
+          <b>Листинг</b>
+          <small>{lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ждём свежий ресёрч'}</small>
+        </span>
         <button className="clear-button" onClick={clearFeed}>Очистить</button>
       </div>
 
       <ResultGrid items={visibleItems} loading={loading} error={loadError} />
 
-      <footer className="footer-note" hidden={!lastResearchAt}>
-        {lastResearchAt && `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}`}
-      </footer>
-
-      <div className="bottom-dock">
-        <div className="avatar">D</div>
-        <label className="dock-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
-      </div>
+      <nav className="bottom-nav" aria-label="Навигация">
+        <button aria-label="Листинг" className={activeNav === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
+          setBudgetOpen(false);
+          setPickerOpen(false);
+          setSubscriptionOpen(false);
+        }}>
+          <span>L</span>
+          <b>Листинг</b>
+        </button>
+        <button aria-label="Бюджет" className={activeNav === 'budget' ? 'nav-button active' : 'nav-button'} onClick={() => {
+          setPickerOpen(false);
+          setSubscriptionOpen(false);
+          setBudgetOpen(true);
+        }}>
+          <span>₮</span>
+          <b>Бюджет</b>
+        </button>
+        <button aria-label="Подарок" className={activeNav === 'gift' ? 'nav-button active' : 'nav-button'} onClick={() => {
+          setBudgetOpen(false);
+          setSubscriptionOpen(false);
+          setPickerOpen(true);
+        }}>
+          <span>◇</span>
+          <b>Подарок</b>
+        </button>
+        <button aria-label="Доступ" className={activeNav === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
+          setBudgetOpen(false);
+          setPickerOpen(false);
+          setSubscriptionOpen(true);
+        }}>
+          <span>✓</span>
+          <b>Доступ</b>
+        </button>
+      </nav>
 
       {pickerOpen && catalog && (
         <GiftPickerSheet catalog={catalog} filters={filters} symbols={symbols} onClose={() => setPickerOpen(false)} onApply={applyFilters} />
