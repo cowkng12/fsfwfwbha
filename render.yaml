@@ -34,7 +34,7 @@ services:
       - key: KEEPALIVE_INTERVAL_SECONDS
         value: 240
       - key: PUBLIC_BASE_URL
-        value: https://fsfwfwbha.onrender.com
+        value: https://fsfwfwbha-gtzl.onrender.com
       - key: CRON_SECRET
         sync: false
       - key: TELEGRAM_API_ID
