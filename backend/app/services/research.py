@@ -220,12 +220,16 @@ class ResearchService:
             self._active_research_max_price = search_max_price
             normalized: list[dict] = []
             similar_normalized: list[dict] = []
+            relaxed_normalized: list[dict] = []
             accepted_by_collection: dict[str, int] = {}
             similar_by_collection: dict[str, int] = {}
+            relaxed_by_collection: dict[str, int] = {}
             telegram_client = await self._telegram_client()
             try:
                 for name in collections:
-                    if len(normalized) >= MAX_LISTINGS_PER_RUN:
+                    if len(normalized) >= MAX_LISTINGS_PER_RUN or (
+                        not normalized and len(relaxed_normalized) >= MAX_LISTINGS_PER_RUN
+                    ):
                         break
                     try:
                         gifts = await self._candidate_gifts(name, search_min_price, search_max_price)
@@ -248,19 +252,29 @@ class ResearchService:
                                 await self._enrich_listing(listing, telegram_client)
                                 similar_normalized.append(listing)
                                 similar_by_collection[collection_key] = similar_by_collection.get(collection_key, 0) + 1
+                            elif (
+                                len(relaxed_normalized) < MAX_LISTINGS_PER_RUN
+                                and relaxed_by_collection.get(collection_key, 0) < ACCEPTED_LISTINGS_PER_COLLECTION
+                                and self._is_relaxed_quality_listing(listing)
+                            ):
+                                await self._enrich_listing(listing, telegram_client)
+                                relaxed_normalized.append(listing)
+                                relaxed_by_collection[collection_key] = relaxed_by_collection.get(collection_key, 0) + 1
                     except MrktAuthError:
                         raise
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
-                if normalized and similar_normalized:
-                    seen_ids = {item.get("external_id") for item in normalized}
-                    for listing in similar_normalized:
+                seen_ids = {item.get("external_id") for item in normalized}
+                for candidates in (similar_normalized, relaxed_normalized):
+                    for listing in candidates:
                         if len(normalized) >= MAX_LISTINGS_PER_RUN:
                             break
                         if listing.get("external_id") in seen_ids:
                             continue
                         normalized.append(listing)
                         seen_ids.add(listing.get("external_id"))
+                    if len(normalized) >= MAX_LISTINGS_PER_RUN:
+                        break
                 if not normalized:
                     normalized.extend(await self._relaxed_listings(collections, telegram_client, search_min_price, search_max_price))
                 if not normalized:
