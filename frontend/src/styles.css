@@ -164,3 +164,314 @@ mark { background: #ffde17; color: #050505; border-radius: 999px; padding: 1px 6
   .filter-item { grid-template-columns: 42px 1fr auto 34px; }
   .filter-item .floor:nth-of-type(2), .filter-item .floor:nth-of-type(3) { display: none; }
 }
+
+/* Blue-black polish */
+:root {
+  --bg: #020612;
+  --panel: #06111f;
+  --panel-2: #081827;
+  --panel-3: #0a2035;
+  --line: #15385c;
+  --line-hot: #2b82ff;
+  --blue: #1476ff;
+  --blue-soft: #65b7ff;
+  --cyan: #52e0ff;
+  --text: #f7fbff;
+  --muted: #8fa8c4;
+}
+
+body {
+  background:
+    linear-gradient(180deg, #020612 0%, #030914 44%, #01040a 100%);
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #5fc7ff;
+  outline-offset: 2px;
+}
+
+.app-shell {
+  background:
+    linear-gradient(180deg, #061c35 0%, #030a15 32%, #02050c 100%);
+  border-left: 1px solid #0b2747;
+  border-right: 1px solid #0b2747;
+}
+
+.access-message,
+.profile-card,
+.nft-card {
+  border-radius: 8px;
+}
+
+.access-message {
+  background: linear-gradient(180deg, #0a1828, #050b14);
+  border-color: #1d4d7a;
+  box-shadow: inset 0 1px 0 #ffffff12, 0 18px 44px #000b;
+}
+
+.profile-card {
+  background:
+    linear-gradient(180deg, #0a1d31 0%, #06111f 100%);
+  border-color: #1a4e82;
+  box-shadow: inset 0 1px 0 #ffffff14, 0 18px 42px #000b;
+}
+
+.meter-row {
+  color: var(--text);
+}
+
+.meter-row i {
+  background: linear-gradient(90deg, #157cff, #52e0ff);
+  box-shadow: 0 0 18px #2794ff99;
+}
+
+.meter-row::after {
+  background: #081827;
+  border: 1px solid #123150;
+}
+
+.budget-row {
+  color: #e8f5ff;
+}
+
+.subscription-button,
+.picker-button,
+.budget-button,
+.section-title {
+  background:
+    linear-gradient(180deg, #1886ff 0%, #0759d6 100%);
+  border: 1px solid #65b7ff;
+  color: #fff;
+  box-shadow: inset 0 1px 0 #ffffff24, 0 10px 24px #006dff40;
+}
+
+.subscription-button:active,
+.picker-button:active,
+.budget-button:active,
+.clear-button:active,
+.primary:active,
+.secondary:active,
+.card-link:active,
+.gift-scope-button:active {
+  transform: translateY(1px);
+}
+
+.subscription-button span {
+  color: #d8f2ff;
+}
+
+.clear-button,
+.secondary {
+  background: #071421;
+  border: 1px solid #1c568c;
+  color: #d7eeff;
+  box-shadow: inset 0 1px 0 #ffffff10;
+}
+
+.grid {
+  gap: 14px;
+}
+
+.nft-card {
+  background: linear-gradient(180deg, #081827, #050c16);
+  border-color: #173858;
+  box-shadow: 0 14px 34px #000a;
+}
+
+.nft-card.is-new {
+  border-color: #52e0ff;
+  box-shadow: 0 0 0 1px #158cff, 0 0 24px #159cff4d, 0 14px 34px #000a;
+}
+
+.nft-art::before {
+  background:
+    linear-gradient(145deg, #ffffff20, transparent 42%),
+    linear-gradient(0deg, #00000036, transparent 62%);
+}
+
+.nft-badge {
+  background: #020713d9;
+  border: 1px solid #245f96;
+  color: #dff5ff;
+}
+
+.trait-line mark,
+mark {
+  background: #0d4f86;
+  color: #dff7ff;
+  border: 1px solid #2baeff;
+}
+
+.combo-line,
+.gift-number,
+.footer-note,
+.empty {
+  color: var(--muted);
+}
+
+.price-line {
+  color: #e7f7ff;
+}
+
+.card-link {
+  background: #071a2c;
+  border-color: #2b75bb;
+  color: #cdeeff;
+  box-shadow: inset 0 1px 0 #ffffff10;
+}
+
+.bottom-dock {
+  bottom: 16px;
+}
+
+.avatar {
+  background: linear-gradient(145deg, #09223a, #116dce);
+  border-color: #5bbcff;
+  box-shadow: 0 12px 28px #000b, 0 0 22px #1476ff40;
+}
+
+.dock-search {
+  background: #06101ce6;
+  border-color: #214d78;
+  color: #8fb7d9;
+  box-shadow: 0 18px 38px #000c, inset 0 1px 0 #ffffff12;
+  backdrop-filter: blur(12px);
+}
+
+.sheet,
+.picker-sheet,
+.subscription-sheet,
+.budget-sheet {
+  background: #000b;
+}
+
+.sheet-panel,
+.picker-panel,
+.subscription-panel,
+.budget-panel {
+  background: linear-gradient(180deg, #081827, #020711);
+  border-color: #1a4e82;
+  box-shadow: 0 -20px 60px #000e, inset 0 1px 0 #ffffff10;
+}
+
+.sheet-close,
+.budget-subhead button {
+  background: #071421;
+  border: 1px solid #1f5d94;
+  color: #dff5ff;
+}
+
+.search {
+  background: #050d18;
+  border: 1px solid #183c62;
+  color: #8fb7d9;
+}
+
+.table-head,
+.select-all,
+.budget-table-head {
+  border-color: #15385c;
+  color: #65b7ff;
+}
+
+.hot {
+  color: #52e0ff;
+}
+
+.check,
+.select-all i,
+.table-head i {
+  background: #06111f;
+  border-color: #244e78;
+  color: #fff;
+}
+
+.check.active {
+  background: linear-gradient(180deg, #52e0ff, #1476ff);
+  border-color: #8beaff;
+  color: #001526;
+}
+
+.primary {
+  background: linear-gradient(180deg, #52e0ff, #1476ff);
+  border: 1px solid #8beaff;
+  color: #001526;
+  box-shadow: 0 10px 22px #1476ff4d;
+}
+
+.brand {
+  color: #5f86aa;
+}
+
+.picker-field input,
+.picker-field select,
+.budget-range input {
+  background: #050d18;
+  border-color: #1b456e;
+  color: #f7fbff;
+  box-shadow: inset 0 1px 0 #ffffff10;
+}
+
+.picker-field input:focus,
+.picker-field select:focus,
+.budget-range input:focus {
+  border-color: #52e0ff;
+  box-shadow: 0 0 0 1px #52e0ff, 0 0 18px #1476ff45;
+}
+
+.gift-scope-button,
+.plan-item,
+.subscription-status {
+  background: linear-gradient(180deg, #0a2035, #071421);
+  border-color: #245f96;
+}
+
+.gift-scope-button strong {
+  background: #0b63d8;
+  box-shadow: inset 0 1px 0 #ffffff20;
+}
+
+.subscription-status.active {
+  background: #08261f;
+  border-color: #2ea384;
+}
+
+.plan-item strong {
+  color: #52e0ff;
+}
+
+.budget-actions {
+  background: linear-gradient(180deg, transparent, #020711 30%);
+}
+
+.picker-actions {
+  background: linear-gradient(180deg, transparent, #020711 28%);
+}
+
+.filter-item,
+.budget-gift-item {
+  border-radius: 8px;
+}
+
+.filter-item:hover,
+.budget-gift-item:hover {
+  background: #071a2c;
+}
+
+@media (max-width: 380px) {
+  .grid {
+    gap: 12px;
+  }
+
+  .section-title,
+  .picker-button,
+  .budget-button {
+    font-size: 12px;
+  }
+}
