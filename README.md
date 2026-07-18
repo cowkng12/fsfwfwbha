@@ -36,6 +36,8 @@ Backend делает self-ping по `PUBLIC_BASE_URL` каждые `KEEPALIVE_IN
 
 После успешного MRKT auth свежий токен сохраняется в SQLite `auth_cache`, поэтому переживает рестарты Render и может использоваться вместо устаревшего `MRKT_AUTH_TOKEN` из env. Если текущий токен протух и MRKT вернул `401`, backend один раз получает новый токен через действующую `TELEGRAM_SESSION`, сохраняет его и повторяет запрос. Если MRKT или Telegram-сессия отвечают запретом, требуется ручная замена `TELEGRAM_SESSION`/секретов в Render.
 
+При ручной замене `TELEGRAM_SESSION` или `MRKT_AUTH_TOKEN` очистите старый кэшированный MRKT token: `GET|POST /api/debug/clear-mrkt-token?secret=<CRON_SECRET>`.
+
 ## API
 
 - `GET /api/health` - статус сервиса.

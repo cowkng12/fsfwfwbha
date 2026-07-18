@@ -514,6 +514,17 @@ async def debug_tokens(
     return result
 
 
+@router.post("/debug/clear-mrkt-token")
+@router.get("/debug/clear-mrkt-token")
+def debug_clear_mrkt_token(
+    secret: str | None = Query(default=None),
+    x_cron_secret: str | None = Header(default=None),
+    client=Depends(mrkt_client),
+):
+    require_cron_secret(secret, x_cron_secret)
+    return client.clear_token_cache()
+
+
 @router.get("/debug/test-alert")
 @router.post("/debug/test-alert")
 async def debug_test_alert(

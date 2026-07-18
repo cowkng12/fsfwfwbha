@@ -346,6 +346,12 @@ class MrktClient:
         self._cookie = None
         self._delete_persisted_token()
 
+    def clear_token_cache(self) -> dict[str, bool]:
+        self._clear_token()
+        self._auth_blocked_until = None
+        self._auth_blocked_reason = None
+        return {"cleared": True, "auth_cooldown_reset": True}
+
     def _load_persisted_token(self) -> str | None:
         try:
             with connect() as conn:
