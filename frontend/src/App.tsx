@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ACCESS_DENIED_MESSAGE,
   clearListings,
-  createSubscriptionInvoice,
   emptyFilters,
   fetchCatalog,
   fetchResults,
@@ -19,8 +18,18 @@ const DEFAULT_BUDGET = '10';
 const SEARCH_FILTERS_KEY = 'floorhunt.searchFilters.v1';
 
 type TelegramWebApp = {
-  openInvoice?: (url: string, callback?: (status: string) => void) => void;
+  openTelegramLink?: (url: string) => void;
   openLink?: (url: string) => void;
+  initDataUnsafe?: {
+    user?: TelegramUser;
+  };
+};
+
+type TelegramUser = {
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
 };
 
 export function App() {
@@ -36,8 +45,7 @@ export function App() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const telegramUser = getTelegramUser();
 
   const handleError = (error: unknown) => {
     if (error instanceof Error && error.message === ACCESS_DENIED_MESSAGE) {
@@ -137,31 +145,6 @@ export function App() {
     setLastResearchAt(null);
   };
 
-  const reloadSubscription = () => {
-    fetchSubscription().then(setSubscription).catch((error) => console.error(error));
-  };
-
-  const buySubscription = async (plan: SubscriptionPlan) => {
-    setSubscriptionBusy(plan.id);
-    setSubscriptionError(null);
-    try {
-      const invoice = await createSubscriptionInvoice(plan.id);
-      const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
-      if (webApp?.openInvoice) {
-        webApp.openInvoice(invoice.invoice_link, () => reloadSubscription());
-      } else if (webApp?.openLink) {
-        webApp.openLink(invoice.invoice_link);
-      } else {
-        window.open(invoice.invoice_link, '_blank', 'noopener,noreferrer');
-      }
-    } catch (error) {
-      console.error(error);
-      setSubscriptionError('Не получилось открыть оплату. Попробуй ещё раз.');
-    } finally {
-      setSubscriptionBusy(null);
-    }
-  };
-
   if (accessDenied) {
     return (
       <main className="app-shell access-shell">
@@ -175,16 +158,8 @@ export function App() {
       <section className="profile-card">
         <div className="profile-top">
           <div>
-            <small className="panel-kicker">FloorHunt</small>
             <h1>Лоты</h1>
           </div>
-          <button className="subscription-pill" onClick={() => {
-            setBudgetOpen(false);
-            setPickerOpen(false);
-            setSubscriptionOpen(true);
-          }}>
-            {subscription?.active ? 'Активна' : 'Доступ'}
-          </button>
         </div>
         <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
         <div className="budget-row">
@@ -232,13 +207,13 @@ export function App() {
           <span>◇</span>
           <b>Подарок</b>
         </button>
-        <button aria-label="Доступ" className={activeNav === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
+        <button aria-label="Профиль" className={activeNav === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setPickerOpen(false);
           setSubscriptionOpen(true);
         }}>
           <span>✓</span>
-          <b>Доступ</b>
+          <b>Профиль</b>
         </button>
       </nav>
 
@@ -253,10 +228,8 @@ export function App() {
       {subscriptionOpen && (
         <SubscriptionSheet
           status={subscription}
-          busyPlanId={subscriptionBusy}
-          error={subscriptionError}
+          user={telegramUser}
           onClose={() => setSubscriptionOpen(false)}
-          onBuy={buySubscription}
         />
       )}
     </main>
@@ -306,39 +279,40 @@ function hasSavedSearchIntent(filters: FilterState) {
 
 function SubscriptionSheet({
   status,
-  busyPlanId,
-  error,
+  user,
   onClose,
-  onBuy,
 }: {
   status: SubscriptionStatus | null;
-  busyPlanId: string | null;
-  error: string | null;
+  user: TelegramUser | null;
   onClose: () => void;
-  onBuy: (plan: SubscriptionPlan) => void;
 }) {
   const currentPlan = status?.plans.find((plan) => plan.id === status.plan_id);
   return (
-    <div className="subscription-sheet">
-      <section className="subscription-panel">
+    <div className="subscription-sheet" role="dialog" aria-modal="true" aria-label="Профиль">
+      <section className="subscription-panel profile-panel">
         <button className="sheet-close" onClick={onClose}>×</button>
-        <h2>Моя подписка</h2>
+        <div className="profile-hero">
+          <div className="profile-avatar">
+            {user?.photo_url ? <img src={user.photo_url} alt="" /> : userInitials(user)}
+          </div>
+          <b>{userDisplayName(user)}</b>
+          {user?.username && <small>@{user.username}</small>}
+        </div>
+        <div className="profile-divider" />
+        <div className="subscription-heading">
+          <h2>Подписка:</h2>
+          <span className={status?.active ? 'subscription-state active' : 'subscription-state'}>
+            {status?.active ? 'активна' : 'неактивна'}
+          </span>
+        </div>
         <div className={status?.active ? 'subscription-status active' : 'subscription-status'}>
-          <b>{status?.active ? 'Активна' : 'Не активна'}</b>
-          <span>{subscriptionStatusText(status, currentPlan)}</span>
+          <b>{subscriptionStatusText(status, currentPlan)}</b>
+          <span>{status?.active ? 'Доступ к поиску лотов включён' : 'Оформи подписку, чтобы начать поиск'}</span>
         </div>
-        <div className="plan-list">
-          {(status?.plans ?? []).map((plan) => (
-            <button className="plan-item" key={plan.id} onClick={() => onBuy(plan)} disabled={Boolean(busyPlanId)}>
-              <span>
-                <b>{plan.title}</b>
-                <small>{plan.description}</small>
-              </span>
-              <strong>{busyPlanId === plan.id ? '...' : `${plan.stars} ⭐`}</strong>
-            </button>
-          ))}
-        </div>
-        {error && <div className="subscription-error">{error}</div>}
+        <button className="contact-button" onClick={openSubscriptionContact}>
+          {status?.active ? 'Продлить' : 'Купить'}
+        </button>
+        <p className="payment-note">Покупка подписки: <b>diamondilya</b></p>
       </section>
     </div>
   );
@@ -350,4 +324,38 @@ function subscriptionStatusText(status: SubscriptionStatus | null, plan?: Subscr
   if (status.status === 'owner') return 'Владелец · навсегда';
   if (!status.expires_at) return `${plan?.title ?? 'Доступ'} · навсегда`;
   return `${plan?.title ?? 'Доступ'} · до ${new Date(status.expires_at).toLocaleDateString()}`;
+}
+
+function getTelegramUser(): TelegramUser | null {
+  const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+  return webApp?.initDataUnsafe?.user ?? null;
+}
+
+function openSubscriptionContact() {
+  const url = 'https://t.me/diamondilya';
+  const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+  if (webApp?.openTelegramLink) {
+    webApp.openTelegramLink(url);
+    return;
+  }
+  if (webApp?.openLink) {
+    webApp.openLink(url);
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function userDisplayName(user: TelegramUser | null) {
+  if (!user) return 'Профиль';
+  return [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Профиль';
+}
+
+function userInitials(user: TelegramUser | null) {
+  const name = userDisplayName(user);
+  return name
+    .split(/\s+/)
+    .map((part) => part.slice(0, 1))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }

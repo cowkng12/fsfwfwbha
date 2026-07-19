@@ -756,3 +756,352 @@ mark {
     font-size: 10px;
   }
 }
+
+/* Minimal black surface */
+:root {
+  --bg: #000;
+  --panel: #050505;
+  --panel-2: #0a0a0a;
+  --panel-3: #111;
+  --line: #242424;
+  --line-hot: #666;
+  --blue: #f2f2f2;
+  --blue-soft: #cfcfcf;
+  --cyan: #fff;
+  --text: #f5f5f5;
+  --muted: #858585;
+}
+
+body {
+  background: #000;
+}
+
+.app-shell {
+  background: #000;
+  border: 0;
+}
+
+.profile-card,
+.nft-card {
+  background: #050505;
+  border-color: #202020;
+  box-shadow: inset 0 1px 0 #ffffff08, 0 16px 34px #000;
+}
+
+.profile-top {
+  margin-bottom: 12px;
+}
+
+.profile-top h1,
+.feed-head b {
+  color: #f5f5f5;
+}
+
+.meter-row {
+  color: #e2e2e2;
+}
+
+.meter-row i {
+  background: #f1f1f1;
+  box-shadow: none;
+}
+
+.meter-row::after {
+  background: #151515;
+  border-color: #242424;
+}
+
+.budget-row {
+  color: #ddd;
+}
+
+.budget-row small {
+  background: #0b0b0b;
+  border-color: #2a2a2a;
+  color: #bdbdbd;
+}
+
+.top-search {
+  background: #050505;
+  border-color: #242424;
+  color: #8b8b8b;
+  box-shadow: inset 0 1px 0 #ffffff08;
+}
+
+.top-search input {
+  color: #f5f5f5;
+}
+
+.top-search input::placeholder,
+.feed-head small,
+.combo-line,
+.gift-number,
+.footer-note,
+.empty {
+  color: #777;
+}
+
+.feed-head .clear-button,
+.clear-button {
+  background: #0a0a0a;
+  border-color: #303030;
+  color: #e7e7e7;
+  box-shadow: none;
+}
+
+.bottom-nav {
+  background: #050505f2;
+  border-color: #252525;
+  box-shadow: 0 18px 46px #000, inset 0 1px 0 #ffffff08;
+}
+
+.nav-button {
+  background: #0b0b0b;
+  border-color: #222;
+  color: #8a8a8a;
+  box-shadow: none;
+}
+
+.nav-button span {
+  background: #151515;
+  color: #bdbdbd;
+}
+
+.nav-button.active {
+  background: #f2f2f2;
+  border-color: #fff;
+  color: #050505;
+  box-shadow: none;
+}
+
+.nav-button.active span {
+  background: #050505;
+  color: #f2f2f2;
+}
+
+.nft-card.is-new {
+  border-color: #aaa;
+  box-shadow: 0 0 0 1px #777, 0 14px 34px #000;
+}
+
+.nft-badge {
+  background: #050505dd;
+  border-color: #333;
+  color: #e4e4e4;
+}
+
+.trait-line mark,
+mark {
+  background: #242424;
+  border-color: #444;
+  color: #eee;
+}
+
+.card-link {
+  background: #111;
+  border-color: #353535;
+  color: #ddd;
+  box-shadow: none;
+}
+
+.sheet-panel,
+.picker-panel,
+.subscription-panel,
+.budget-panel {
+  background: #050505;
+  border-color: #292929;
+  box-shadow: 0 -20px 60px #000, inset 0 1px 0 #ffffff08;
+  padding-bottom: 116px;
+}
+
+.sheet-close,
+.budget-subhead button {
+  background: #0c0c0c;
+  border-color: #383838;
+  color: #eee;
+}
+
+.search,
+.picker-field input,
+.picker-field select,
+.budget-range input {
+  background: #090909;
+  border-color: #2b2b2b;
+  color: #f5f5f5;
+  box-shadow: none;
+}
+
+.picker-field input:focus,
+.picker-field select:focus,
+.budget-range input:focus {
+  border-color: #888;
+  box-shadow: 0 0 0 1px #888;
+}
+
+.gift-scope-button,
+.plan-item,
+.subscription-status {
+  background: #0b0b0b;
+  border-color: #2b2b2b;
+  color: #f2f2f2;
+  box-shadow: none;
+}
+
+.gift-scope-button strong {
+  background: #242424;
+  color: #f2f2f2;
+}
+
+.secondary,
+.clear-button {
+  background: #0b0b0b;
+  border-color: #343434;
+  color: #f2f2f2;
+}
+
+.primary {
+  background: #f2f2f2;
+  border-color: #fff;
+  color: #050505;
+  box-shadow: none;
+}
+
+.subscription-status.active {
+  background: #111;
+  border-color: #555;
+}
+
+.plan-item strong {
+  color: #f2f2f2;
+}
+
+.subscription-error {
+  background: #171010;
+  border-color: #5a3030;
+  color: #f3caca;
+}
+
+.picker-actions,
+.budget-actions {
+  position: static;
+  bottom: auto;
+  padding: 16px 0 0;
+  background: transparent;
+}
+
+.profile-panel {
+  min-height: min(82vh, 680px);
+}
+
+.profile-hero {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 18px 0 14px;
+  text-align: center;
+}
+
+.profile-avatar {
+  width: 86px;
+  height: 86px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #1a1a1a;
+  border: 1px solid #4a4a4a;
+  color: #f5f5f5;
+  font-size: 27px;
+  font-weight: 900;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-hero b {
+  color: #f5f5f5;
+  font-size: 21px;
+}
+
+.profile-hero small {
+  color: #888;
+  font-size: 13px;
+}
+
+.profile-divider {
+  height: 1px;
+  margin: 4px 0 20px;
+  background: #232323;
+}
+
+.subscription-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.subscription-heading h2 {
+  margin: 0;
+  color: #f5f5f5;
+  font-size: 21px;
+}
+
+.subscription-state {
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.subscription-state.active {
+  color: #f5f5f5;
+}
+
+.profile-plan-list {
+  margin-top: 12px;
+}
+
+.profile-plan-list .plan-item {
+  min-height: 70px;
+}
+
+.profile-plan-list .plan-item strong {
+  min-width: 78px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #555;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.contact-button {
+  width: 100%;
+  height: 48px;
+  margin-top: 14px;
+  border-radius: 8px;
+  background: #f2f2f2;
+  border: 1px solid #fff;
+  color: #050505;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.contact-button:active {
+  transform: translateY(1px);
+}
+
+.payment-note {
+  margin: 18px 0 0;
+  color: #777;
+  font-size: 13px;
+  text-align: center;
+}
+
+.payment-note b {
+  color: #ddd;
+}

@@ -32,7 +32,7 @@ PRIORITY_BACKDROP_SCAN_LIMIT = 120
 PRIORITY_FILTER_BATCH_SIZE = 4
 PRIORITY_FILTER_RESULT_COUNT = 25
 RAW_CANDIDATE_SCAN_LIMIT = 50
-ACCEPTED_LISTINGS_PER_COLLECTION = 3
+ACCEPTED_LISTINGS_PER_COLLECTION = 2
 MAX_LISTINGS_PER_RUN = 10
 SIMILAR_LISTINGS_PER_COLLECTION = 1
 MAX_SIMILAR_LISTINGS_PER_RUN = 2
@@ -214,7 +214,7 @@ class ResearchService:
     ) -> int:
         async with self._lock:
             init_db()
-            collections = collection_names or default_collection_names()
+            collections = self._run_collections(collection_names or default_collection_names())
             search_min_price = min_price
             search_max_price = max_price or self.mrkt.settings.mrkt_research_max_price
             self._active_research_max_price = search_max_price
@@ -265,14 +265,19 @@ class ResearchService:
                     except Exception as exc:
                         self.runs.add("mrkt", "error", f"{name}: {exc}")
                 seen_ids = {item.get("external_id") for item in normalized}
+                collection_counts = self._collection_counts(normalized)
                 for candidates in (similar_normalized, relaxed_normalized):
                     for listing in candidates:
                         if len(normalized) >= MAX_LISTINGS_PER_RUN:
                             break
                         if listing.get("external_id") in seen_ids:
                             continue
+                        collection_key = self._collection_limit_key(listing)
+                        if collection_counts.get(collection_key, 0) >= ACCEPTED_LISTINGS_PER_COLLECTION:
+                            continue
                         normalized.append(listing)
                         seen_ids.add(listing.get("external_id"))
+                        collection_counts[collection_key] = collection_counts.get(collection_key, 0) + 1
                     if len(normalized) >= MAX_LISTINGS_PER_RUN:
                         break
                 if not normalized:
@@ -286,6 +291,21 @@ class ResearchService:
             count = self.listings.upsert_many(normalized)
             self.runs.add("mrkt", "success", f"stored {count} listings")
             return count
+
+    def _run_collections(self, collections: list[str]) -> list[str]:
+        clean = list(dict.fromkeys(name.strip() for name in collections if name and name.strip()))
+        if not clean:
+            return []
+        interval = max(int(self.mrkt.settings.research_interval_seconds), 1)
+        offset = int(datetime.now(timezone.utc).timestamp() // interval) % len(clean)
+        return clean[offset:] + clean[:offset]
+
+    def _collection_counts(self, listings: list[dict]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for listing in listings:
+            key = self._collection_limit_key(listing)
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     async def _candidate_gifts(self, collection: str, min_price: float | None = None, max_price: float | None = None) -> list[dict[str, Any]]:
         max_price = max_price or self.mrkt.settings.mrkt_research_max_price
