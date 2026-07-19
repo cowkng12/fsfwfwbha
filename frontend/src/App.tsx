@@ -16,6 +16,7 @@ import { BudgetSheet } from './components/BudgetSheet';
 
 const DEFAULT_BUDGET = '10';
 const SEARCH_FILTERS_KEY = 'floorhunt.searchFilters.v1';
+type AppPage = 'listing' | 'profile';
 
 type TelegramWebApp = {
   openTelegramLink?: (url: string) => void;
@@ -43,7 +44,7 @@ export function App() {
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [activePage, setActivePage] = useState<AppPage>('listing');
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const telegramUser = getTelegramUser();
 
@@ -118,7 +119,6 @@ export function App() {
     .filter((value) => value.length > 0).length
     + [filters.number, filters.minPrice].filter(Boolean).length
     + (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET ? 1 : 0);
-  const activeNav = subscriptionOpen ? 'profile' : budgetOpen ? 'budget' : pickerOpen ? 'gift' : 'listing';
 
   const applyFilters = (nextFilters: FilterState) => {
     setFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
@@ -155,62 +155,62 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <section className="profile-card">
-        <div className="profile-top">
-          <div>
-            <h1>Лоты</h1>
+      {activePage === 'listing' ? (
+        <>
+          <section className="profile-card listing-panel">
+            <div className="profile-top">
+              <div>
+                <h1>Лоты</h1>
+              </div>
+            </div>
+            <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
+            <div className="budget-row">
+              <span>{budgetSummary(filters)}</span>
+              <small>{activeFilterCount ? `${activeFilterCount} фильтра` : 'Все подарки'}</small>
+            </div>
+            <div className="listing-tools" aria-label="Настройки листинга">
+              <button onClick={() => setBudgetOpen(true)}>
+                <span>₮</span>
+                <b>Бюджет</b>
+              </button>
+              <button onClick={() => setPickerOpen(true)}>
+                <span>◇</span>
+                <b>Подарок</b>
+              </button>
+            </div>
+            <label className="top-search">
+              <span>⌕</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
+            </label>
+          </section>
+
+          <div className="feed-head">
+            <span>
+              <b>Листинги</b>
+              <small>{lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ждём свежий ресёрч'}</small>
+            </span>
+            <button className="clear-button" onClick={clearFeed}>Очистить</button>
           </div>
-        </div>
-        <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
-        <div className="budget-row">
-          <span>{budgetSummary(filters)}</span>
-          <small>{activeFilterCount ? `${activeFilterCount} фильтра` : 'Все подарки'}</small>
-        </div>
-        <label className="top-search">
-          <span>⌕</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
-        </label>
-      </section>
 
-      <div className="feed-head">
-        <span>
-          <b>Листинг</b>
-          <small>{lastResearchAt ? `Обновлено ${new Date(lastResearchAt).toLocaleTimeString()}` : 'Ждём свежий ресёрч'}</small>
-        </span>
-        <button className="clear-button" onClick={clearFeed}>Очистить</button>
-      </div>
-
-      <ResultGrid items={visibleItems} loading={loading} error={loadError} />
+          <ResultGrid items={visibleItems} loading={loading} error={loadError} />
+        </>
+      ) : (
+        <ProfilePage status={subscription} user={telegramUser} />
+      )}
 
       <nav className="bottom-nav" aria-label="Навигация">
-        <button aria-label="Листинг" className={activeNav === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
+        <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setPickerOpen(false);
-          setSubscriptionOpen(false);
+          setActivePage('listing');
         }}>
           <span>L</span>
-          <b>Листинг</b>
+          <b>Листинги</b>
         </button>
-        <button aria-label="Бюджет" className={activeNav === 'budget' ? 'nav-button active' : 'nav-button'} onClick={() => {
-          setPickerOpen(false);
-          setSubscriptionOpen(false);
-          setBudgetOpen(true);
-        }}>
-          <span>₮</span>
-          <b>Бюджет</b>
-        </button>
-        <button aria-label="Подарок" className={activeNav === 'gift' ? 'nav-button active' : 'nav-button'} onClick={() => {
-          setBudgetOpen(false);
-          setSubscriptionOpen(false);
-          setPickerOpen(true);
-        }}>
-          <span>◇</span>
-          <b>Подарок</b>
-        </button>
-        <button aria-label="Профиль" className={activeNav === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
+        <button aria-label="Профиль" className={activePage === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setPickerOpen(false);
-          setSubscriptionOpen(true);
+          setActivePage('profile');
         }}>
           <span>✓</span>
           <b>Профиль</b>
@@ -225,13 +225,6 @@ export function App() {
         <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
       )}
 
-      {subscriptionOpen && (
-        <SubscriptionSheet
-          status={subscription}
-          user={telegramUser}
-          onClose={() => setSubscriptionOpen(false)}
-        />
-      )}
     </main>
   );
 }
@@ -277,53 +270,52 @@ function hasSavedSearchIntent(filters: FilterState) {
   );
 }
 
-function SubscriptionSheet({
+function ProfilePage({
   status,
   user,
-  onClose,
 }: {
   status: SubscriptionStatus | null;
   user: TelegramUser | null;
-  onClose: () => void;
 }) {
   const currentPlan = status?.plans.find((plan) => plan.id === status.plan_id);
+  const daysLeft = subscriptionDaysLeft(status);
+  const action = status?.active ? 'renew' : 'buy';
   return (
-    <div className="subscription-sheet" role="dialog" aria-modal="true" aria-label="Профиль">
-      <section className="subscription-panel profile-panel">
-        <button className="sheet-close" onClick={onClose}>×</button>
-        <div className="profile-hero">
-          <div className="profile-avatar">
-            {user?.photo_url ? <img src={user.photo_url} alt="" /> : userInitials(user)}
-          </div>
-          <b>{userDisplayName(user)}</b>
-          {user?.username && <small>@{user.username}</small>}
+    <section className="profile-page" aria-label="Профиль">
+      <div className="profile-hero">
+        <div className="profile-avatar">
+          {user?.photo_url ? <img src={user.photo_url} alt="" /> : userInitials(user)}
         </div>
-        <div className="profile-divider" />
-        <div className="subscription-heading">
-          <h2>Подписка:</h2>
-          <span className={status?.active ? 'subscription-state active' : 'subscription-state'}>
-            {status?.active ? 'активна' : 'неактивна'}
-          </span>
-        </div>
-        <div className={status?.active ? 'subscription-status active' : 'subscription-status'}>
-          <b>{subscriptionStatusText(status, currentPlan)}</b>
-          <span>{status?.active ? 'Доступ к поиску лотов включён' : 'Оформи подписку, чтобы начать поиск'}</span>
-        </div>
-        <button className="contact-button" onClick={openSubscriptionContact}>
-          {status?.active ? 'Продлить' : 'Купить'}
-        </button>
-        <p className="payment-note">Покупка подписки: <b>diamondilya</b></p>
-      </section>
-    </div>
+        <b>{userDisplayName(user)}</b>
+        {user?.username && <small>@{user.username}</small>}
+      </div>
+
+      <div className="profile-divider" />
+
+      <div className="subscription-heading">
+        <h2>Подписка:</h2>
+        <span className={status?.active ? 'subscription-state active' : 'subscription-state'}>
+          {status?.active ? 'активна' : 'неактивна'}
+        </span>
+      </div>
+      <div className={status?.active ? 'subscription-status active' : 'subscription-status'}>
+        <b>{subscriptionStatusText(status, currentPlan)}</b>
+        {daysLeft !== null && <span>До окончания вашей подписки осталось {daysWord(daysLeft)}</span>}
+        {!status?.active && <span>Оформи подписку, чтобы начать поиск</span>}
+      </div>
+      <button className="contact-button" onClick={() => openSubscriptionContact(action)}>
+        {status?.active ? 'Продлить' : 'Приобрести подписку'}
+      </button>
+    </section>
   );
 }
 
 function subscriptionStatusText(status: SubscriptionStatus | null, plan?: SubscriptionPlan) {
   if (!status) return 'Загружаем данные';
-  if (!status.active) return 'Выбери тариф ниже';
+  if (!status.active) return 'Неактивна';
   if (status.status === 'owner') return 'Владелец · навсегда';
   if (!status.expires_at) return `${plan?.title ?? 'Доступ'} · навсегда`;
-  return `${plan?.title ?? 'Доступ'} · до ${new Date(status.expires_at).toLocaleDateString()}`;
+  return `Действительна до ${new Date(status.expires_at).toLocaleDateString()}`;
 }
 
 function getTelegramUser(): TelegramUser | null {
@@ -331,8 +323,10 @@ function getTelegramUser(): TelegramUser | null {
   return webApp?.initDataUnsafe?.user ?? null;
 }
 
-function openSubscriptionContact() {
-  const url = 'https://t.me/diamondilya';
+function openSubscriptionContact(action: 'buy' | 'renew') {
+  const text = subscriptionMessage(action);
+  navigator.clipboard?.writeText(text).catch(() => undefined);
+  const url = `https://t.me/diamondilya?text=${encodeURIComponent(text)}`;
   const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
   if (webApp?.openTelegramLink) {
     webApp.openTelegramLink(url);
@@ -343,6 +337,31 @@ function openSubscriptionContact() {
     return;
   }
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function subscriptionMessage(action: 'buy' | 'renew') {
+  return [
+    '#подписка',
+    action === 'buy' ? 'Привет, хочу купить подписку' : 'Привет, хочу продлить подписку',
+    'На день/неделю/месяц/навсегда',
+  ].join('\n');
+}
+
+function subscriptionDaysLeft(status: SubscriptionStatus | null) {
+  if (!status?.active || !status.expires_at || status.status === 'owner') return null;
+  const msLeft = new Date(status.expires_at).getTime() - Date.now();
+  return Math.max(0, Math.ceil(msLeft / 86_400_000));
+}
+
+function daysWord(days: number) {
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  const word = mod10 === 1 && mod100 !== 11
+    ? 'день'
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+      ? 'дня'
+      : 'дней';
+  return `${days} ${word}`;
 }
 
 function userDisplayName(user: TelegramUser | null) {
