@@ -1165,9 +1165,9 @@ mark {
 }
 
 .profile-page .profile-avatar {
-  width: 104px;
-  height: 104px;
-  font-size: 32px;
+  width: 128px;
+  height: 128px;
+  font-size: 38px;
 }
 
 .profile-page .profile-divider {
@@ -1200,5 +1200,34 @@ mark {
 
   .profile-page {
     padding-inline: 10px;
+  }
+}
+
+/* Stable sheet close control */
+.picker-panel,
+.budget-panel {
+  padding-top: 58px;
+}
+
+.picker-panel > .sheet-close,
+.budget-panel > .sheet-close {
+  position: fixed;
+  top: max(18px, calc(12vh + 12px));
+  left: 50%;
+  z-index: 70;
+  transform: translateX(-50%);
+  margin: 0;
+}
+
+.picker-panel h2,
+.budget-panel h2 {
+  margin-top: 0;
+}
+
+@media (max-width: 380px) {
+  .profile-page .profile-avatar {
+    width: 116px;
+    height: 116px;
+    font-size: 35px;
   }
 }

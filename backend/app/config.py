@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     telegram_allowed_user_ids: str | None = None
     telegram_granted_user_ids: str | None = None
     telegram_webhook_secret: str | None = None
+    telegram_subscription_video: str | None = None
     public_base_url: str | None = None
     cron_secret: str | None = None
     mrkt_auth_token: str | None = Field(default=None, description="Optional cached MRKT token")

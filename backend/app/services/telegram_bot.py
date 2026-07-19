@@ -127,19 +127,12 @@ class TelegramBotService:
         )
         chat_id = (message.get("chat") or {}).get("id")
         if chat_id:
-            await self.send_subscription_receipt(chat_id, status)
+            plan = SubscriptionRepository().plan(plan_id)
+            await self.send_subscription_receipt(chat_id, status, plan.get("duration_days") if plan else None)
 
-    async def send_subscription_receipt(self, chat_id: int, status: dict) -> None:
+    async def send_subscription_receipt(self, chat_id: int, status: dict, days: int | None = None) -> None:
         expires_at = status.get("expires_at")
-        expires_text = "навсегда" if not expires_at else self._format_date(expires_at)
-        await self._post(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": f"<b>Подписка активирована</b>\nДоступ: <b>{escape(expires_text)}</b>",
-                "parse_mode": "HTML",
-            },
-        )
+        await self._send_subscription_welcome(chat_id, days, expires_at)
 
     async def handle_grant_command(self, chat_id: int, admin_user_id: int | None, text: str) -> None:
         if not self._is_admin(chat_id, admin_user_id):
@@ -177,7 +170,7 @@ class TelegramBotService:
                 "parse_mode": "HTML",
             },
         )
-        await self._try_notify_granted_user(target_user_id, expires_text)
+        await self._try_notify_granted_user(target_user_id, status, days)
 
     async def handle_revoke_command(self, chat_id: int, admin_user_id: int | None, text: str) -> None:
         if not self._is_admin(chat_id, admin_user_id):
@@ -285,16 +278,9 @@ class TelegramBotService:
             },
         )
 
-    async def _try_notify_granted_user(self, user_id: int, expires_text: str) -> None:
+    async def _try_notify_granted_user(self, user_id: int, status: dict, days: int | None) -> None:
         try:
-            await self._post(
-                "sendMessage",
-                {
-                    "chat_id": user_id,
-                    "text": f"<b>Вам выдали доступ</b>\nДоступ: <b>{escape(expires_text)}</b>",
-                    "parse_mode": "HTML",
-                },
-            )
+            await self._send_subscription_welcome(user_id, days, status.get("expires_at"))
         except Exception as exc:
             logger.info("Cannot notify granted user %s: %s", user_id, exc)
 
@@ -495,6 +481,42 @@ class TelegramBotService:
             self._format_links(listing, preview_url),
         ])
 
+    async def _send_subscription_welcome(self, chat_id: int, days: int | None, expires_at: str | None) -> None:
+        text = self._subscription_welcome_text(days, expires_at)
+        video = (self.settings.telegram_subscription_video or "").strip()
+        if video:
+            try:
+                await self._post(
+                    "sendVideo",
+                    {
+                        "chat_id": chat_id,
+                        "video": video,
+                        "caption": text,
+                        "parse_mode": "HTML",
+                    },
+                )
+                return
+            except Exception as exc:
+                logger.warning("Telegram subscription video failed for %s: %s", chat_id, exc)
+        await self._post(
+            "sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+            },
+        )
+
+    def _subscription_welcome_text(self, days: int | None, expires_at: str | None) -> str:
+        duration = "навсегда" if days is None else f"{days} {self._day_word(days)}"
+        expires_text = "навсегда" if not expires_at else self._format_date_short(expires_at)
+        return "\n".join([
+            "<b>Спасибо за покупку!</b>",
+            f"Вам выдана подписка на <b>{escape(duration)}</b>",
+            f"Истекает <b>{escape(expires_text)}</b>",
+            "Приятного использования!",
+        ])
+
     def _format_combo_market(self, listing: Listing) -> str:
         parts: list[str] = []
         if listing.combo_listed_count is not None:
@@ -582,6 +604,12 @@ class TelegramBotService:
         if not parsed:
             return value
         return parsed.strftime("%d.%m.%Y %H:%M UTC")
+
+    def _format_date_short(self, value: str) -> str:
+        parsed = self._parse_datetime(value)
+        if not parsed:
+            return value
+        return parsed.strftime("%d.%m.%Y")
 
     def _format_availability(self, value: str) -> str:
         parsed = self._parse_datetime(value)

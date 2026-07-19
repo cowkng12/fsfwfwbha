@@ -66,8 +66,8 @@ export function GiftPickerSheet({ catalog, filters, symbols, onClose, onApply }:
   const clear = () => setDraft({ nfts: [], models: [], backdrops: [], symbols: [], number: '', minPrice: '', maxPrice: '' });
 
   return (
-    <div className="picker-sheet" role="dialog" aria-modal="true" aria-label="Выбрать подарок">
-      <div className="picker-panel">
+    <div className="picker-sheet" role="dialog" aria-modal="true" aria-label="Выбрать подарок" onClick={onClose}>
+      <div className="picker-panel" onClick={(event) => event.stopPropagation()}>
         <button className="sheet-close" onClick={onClose} aria-label="Закрыть">⌄</button>
         <h2>Выбрать подарок</h2>
 
