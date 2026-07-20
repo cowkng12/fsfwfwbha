@@ -1287,6 +1287,10 @@ mark {
   flex-direction: column;
 }
 
+.budget-panel.gift-picker-mode {
+  padding-top: 14px;
+}
+
 .picker-panel {
   display: flex;
   flex-direction: column;
