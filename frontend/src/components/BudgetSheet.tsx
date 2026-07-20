@@ -58,7 +58,7 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
   return (
     <div className="budget-sheet" role="dialog" aria-modal="true" aria-label="Бюджет" onClick={onClose}>
       <section className={giftPickerOpen ? 'budget-panel gift-picker-mode' : 'budget-panel'} onClick={(event) => event.stopPropagation()}>
-        {!giftPickerOpen && <button className="sheet-close" onClick={onClose} aria-label="Закрыть">×</button>}
+        <button className="sheet-close" onClick={onClose} aria-label="Закрыть">×</button>
         {!giftPickerOpen ? (
           <>
             <h2>Бюджет</h2>
@@ -86,10 +86,9 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
           </>
         ) : (
           <>
-            <header className="budget-subhead">
+            <div className="budget-gift-topbar">
               <button onClick={() => setGiftPickerOpen(false)}>‹</button>
-              <h2>Подарки</h2>
-            </header>
+            </div>
             <label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
             <div className="budget-table-head">
               <button onClick={toggleAllVisible}>Выбрать все</button>

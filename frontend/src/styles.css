@@ -1291,6 +1291,23 @@ mark {
   padding-top: 14px;
 }
 
+.budget-gift-topbar {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 0 8px;
+}
+
+.budget-gift-topbar button {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #0c0c0c;
+  border: 1px solid #383838;
+  color: #eee;
+  font-size: 28px;
+  line-height: 1;
+}
+
 .picker-panel {
   display: flex;
   flex-direction: column;
