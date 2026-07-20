@@ -121,8 +121,10 @@ export function App() {
     + (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET ? 1 : 0);
 
   const applyFilters = (nextFilters: FilterState) => {
-    setFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
+    const normalized = normalizeFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
+    setFilters(normalized);
     setPickerOpen(false);
+    saveSearchPreferences(normalized).catch((error) => console.error(error));
   };
 
   const applyBudget = (nextFilters: FilterState) => {
