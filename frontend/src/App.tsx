@@ -198,7 +198,7 @@ export function App() {
         <ProfilePage status={subscription} user={telegramUser} />
       )}
 
-      <nav className="bottom-nav" aria-label="Навигация">
+      <nav className={pickerOpen || budgetOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
         <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setPickerOpen(false);
