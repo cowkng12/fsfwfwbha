@@ -336,9 +336,8 @@ def results(
         max_price=maxPrice,
         limit=limit,
     )
-    has_filters = any([collection_names, backdrop_names, model_names, symbol_names, normalized_number, minPrice, maxPrice])
     try:
-        listings = repo.find(filters) if has_filters else repo.find_recent(limit)
+        listings = repo.find(filters, delivered_to_user_id=user_id)
         items = DealAnalyzer().apply_scores(listings)
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Cannot load results") from exc

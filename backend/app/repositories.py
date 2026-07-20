@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
@@ -7,6 +8,8 @@ from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
 from app.supabase_store import SupabaseStore
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -104,7 +107,7 @@ class ListingRepository:
             )
         return len(rows)
 
-    def find(self, filters: FilterRequest) -> list[Listing]:
+    def find(self, filters: FilterRequest, delivered_to_user_id: int | str | None = None) -> list[Listing]:
         where = []
         params: list[str | float | int] = []
         if filters.collection_names:
@@ -132,16 +135,58 @@ class ListingRepository:
         self._append_blocked_model_filter(where, params)
         self._append_collection_quality_filter(where, params)
         where.append("NOT EXISTS (SELECT 1 FROM hidden_items WHERE hidden_items.source = listings.source AND hidden_items.external_id = listings.external_id)")
+        if delivered_to_user_id is not None:
+            where.append(
+                "EXISTS (SELECT 1 FROM alert_deliveries WHERE alert_deliveries.source = listings.source "
+                "AND alert_deliveries.external_id = listings.external_id AND alert_deliveries.user_id = ?)"
+            )
+            params.append(str(delivered_to_user_id))
 
         sql = "SELECT * FROM listings"
         if where:
             sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY first_seen_at DESC, updated_at DESC, price ASC LIMIT ?"
+        if delivered_to_user_id is not None:
+            sql += (
+                " ORDER BY (SELECT created_at FROM alert_deliveries "
+                "WHERE alert_deliveries.source = listings.source "
+                "AND alert_deliveries.external_id = listings.external_id "
+                "AND alert_deliveries.user_id = ? LIMIT 1) DESC, "
+                "first_seen_at DESC, updated_at DESC, price ASC LIMIT ?"
+            )
+            params.append(str(delivered_to_user_id))
+        else:
+            sql += " ORDER BY first_seen_at DESC, updated_at DESC, price ASC LIMIT ?"
         params.append(filters.limit)
 
         with connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [Listing(**dict(row), deal_score=0) for row in rows]
+
+    def record_alert_delivery(self, user_id: int | str, source: str, external_id: str) -> None:
+        now = utc_now()
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO alert_deliveries (user_id, source, external_id, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (str(user_id), source, external_id, now),
+            )
+        store = SupabaseStore()
+        if store.enabled:
+            try:
+                store.upsert(
+                    "alert_deliveries",
+                    {
+                        "user_id": str(user_id),
+                        "source": source,
+                        "external_id": external_id,
+                        "created_at": now,
+                    },
+                    on_conflict="user_id,source,external_id",
+                )
+            except Exception as exc:
+                logger.info("Supabase alert_deliveries write failed: %s", exc)
 
     def find_recent(self, limit: int = 80) -> list[Listing]:
         params: list[str | float | int] = [get_settings().mrkt_max_price]

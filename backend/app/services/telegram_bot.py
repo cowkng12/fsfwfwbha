@@ -369,6 +369,7 @@ class TelegramBotService:
             try:
                 for chat_id in matched_recipients:
                     await self.send_listing_alert(listing, chat_id=chat_id)
+                    repo.record_alert_delivery(chat_id, listing.source, listing.external_id)
                     delivered = True
                 if delivered:
                     repo.mark_notified(listing.source, listing.external_id)

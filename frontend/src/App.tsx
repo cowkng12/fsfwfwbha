@@ -58,7 +58,14 @@ export function App() {
   };
 
   useEffect(() => {
-    fetchCatalog().then(setCatalog).catch(handleError);
+    let ignore = false;
+    const loadCatalog = () => fetchCatalog()
+      .then((data) => {
+        if (!ignore) setCatalog(data);
+      })
+      .catch(handleError);
+    loadCatalog();
+    const timer = window.setInterval(loadCatalog, 60000);
     fetchSubscription().then(setSubscription).catch((error) => console.error(error));
     fetchSearchPreferences()
       .then((saved) => {
@@ -72,6 +79,10 @@ export function App() {
         }
       })
       .catch((error) => console.error(error));
+    return () => {
+      ignore = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {

@@ -186,6 +186,17 @@ def init_db() -> None:
                 PRIMARY KEY (source, external_id)
             );
 
+            CREATE TABLE IF NOT EXISTS alert_deliveries (
+                user_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, source, external_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_alert_deliveries_user_created
+            ON alert_deliveries (user_id, created_at DESC);
+
             CREATE TABLE IF NOT EXISTS subscriptions (
                 user_id TEXT PRIMARY KEY,
                 plan_id TEXT NOT NULL,
