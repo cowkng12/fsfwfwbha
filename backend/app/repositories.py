@@ -692,8 +692,6 @@ class SubscriptionRepository:
         settings = get_settings()
         recipients = {str(item) for item in (settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set)}
         recipients.update(str(item) for item in settings.telegram_granted_user_id_set)
-        if settings.telegram_alert_chat_id:
-            recipients.add(str(settings.telegram_alert_chat_id))
         now = utc_now()
         store = SupabaseStore()
         if store.enabled:
@@ -716,6 +714,8 @@ class SubscriptionRepository:
                     (now,),
                 ).fetchall()
         recipients.update(str(row["user_id"]) for row in rows)
+        if not recipients and settings.telegram_alert_chat_id:
+            recipients.add(str(settings.telegram_alert_chat_id))
         return sorted(recipients)
 
     def activate(
