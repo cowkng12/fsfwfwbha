@@ -30,6 +30,7 @@ from app.schemas import (
 )
 from app.services.research import DealAnalyzer, ResearchService
 from app.services.telegram_bot import TelegramBotService, WHITELIST_DENIED_MESSAGE
+from app.supabase_store import SupabaseStore
 
 router = APIRouter(prefix="/api")
 
@@ -114,7 +115,7 @@ def telegram_init_data_user_id(init_data: str | None, bot_token: str | None) -> 
 
 @router.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "supabase_persistence": SupabaseStore().enabled}
 
 
 @router.get("/catalog")

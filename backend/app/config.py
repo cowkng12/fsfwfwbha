@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     telegram_subscription_video: str | None = None
     public_base_url: str | None = None
     cron_secret: str | None = None
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
     mrkt_auth_token: str | None = Field(default=None, description="Optional cached MRKT token")
 
     @property

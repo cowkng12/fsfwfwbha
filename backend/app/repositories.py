@@ -6,6 +6,7 @@ from app.catalog import blocked_collection_model_pairs, canonical_collection_nam
 from app.config import get_settings
 from app.database import connect
 from app.schemas import FilterRequest, Listing
+from app.supabase_store import SupabaseStore
 
 
 def utc_now() -> str:
@@ -398,6 +399,16 @@ class SearchPreferencesRepository:
     DEFAULT_MAX_PRICE = 10.0
 
     def get(self, user_id: int | str) -> dict:
+        store = SupabaseStore()
+        if store.enabled:
+            row = store.select_one("search_preferences", {"select": "*", "user_id": f"eq.{user_id}"})
+            if not row:
+                return self._default()
+            try:
+                filters = json.loads(row["filters_json"])
+            except (json.JSONDecodeError, TypeError):
+                filters = {}
+            return self._normalize(filters, updated_at=row.get("updated_at"))
         with connect() as conn:
             row = conn.execute("SELECT * FROM search_preferences WHERE user_id = ?", (str(user_id),)).fetchone()
         if not row:
@@ -411,6 +422,19 @@ class SearchPreferencesRepository:
     def save(self, user_id: int | str, filters: dict) -> dict:
         normalized = self._normalize(filters)
         now = utc_now()
+        store = SupabaseStore()
+        if store.enabled:
+            store.upsert(
+                "search_preferences",
+                {
+                    "user_id": str(user_id),
+                    "filters_json": json.dumps(normalized, ensure_ascii=False),
+                    "updated_at": now,
+                },
+                on_conflict="user_id",
+            )
+            normalized["updated_at"] = now
+            return normalized
         with connect() as conn:
             conn.execute(
                 """
@@ -448,12 +472,22 @@ class SearchPreferencesRepository:
         recipients = SubscriptionRepository().active_recipient_ids()
         if not recipients:
             return []
-        placeholders = ",".join("?" for _ in recipients)
-        with connect() as conn:
-            rows = conn.execute(
-                f"SELECT user_id, filters_json, updated_at FROM search_preferences WHERE user_id IN ({placeholders})",
-                tuple(recipients),
-            ).fetchall()
+        store = SupabaseStore()
+        if store.enabled:
+            rows = store.select(
+                "search_preferences",
+                {
+                    "select": "user_id,filters_json,updated_at",
+                    "user_id": f"in.({','.join(recipients)})",
+                },
+            )
+        else:
+            placeholders = ",".join("?" for _ in recipients)
+            with connect() as conn:
+                rows = conn.execute(
+                    f"SELECT user_id, filters_json, updated_at FROM search_preferences WHERE user_id IN ({placeholders})",
+                    tuple(recipients),
+                ).fetchall()
         saved: dict[str, dict] = {}
         for row in rows:
             try:
@@ -611,6 +645,23 @@ class SubscriptionRepository:
                 "updated_at": None,
                 "plans": self.plans(),
             }
+        store = SupabaseStore()
+        if store.enabled:
+            row = store.select_one("subscriptions", {"select": "*", "user_id": f"eq.{user_id}"})
+            if not row:
+                return {
+                    "active": False,
+                    "plan_id": None,
+                    "status": "inactive",
+                    "started_at": None,
+                    "expires_at": None,
+                    "updated_at": None,
+                    "plans": self.plans(),
+                }
+            active = row["status"] == "active" and (not row.get("expires_at") or row["expires_at"] > now)
+            row["active"] = active
+            row["plans"] = self.plans()
+            return row
         with connect() as conn:
             row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
         if not row:
@@ -644,15 +695,26 @@ class SubscriptionRepository:
         if settings.telegram_alert_chat_id:
             recipients.add(str(settings.telegram_alert_chat_id))
         now = utc_now()
-        with connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT user_id FROM subscriptions
-                WHERE status = 'active'
-                  AND (expires_at IS NULL OR expires_at > ?)
-                """,
-                (now,),
-            ).fetchall()
+        store = SupabaseStore()
+        if store.enabled:
+            rows = store.select(
+                "subscriptions",
+                {
+                    "select": "user_id",
+                    "status": "eq.active",
+                    "or": f"(expires_at.is.null,expires_at.gt.{now})",
+                },
+            )
+        else:
+            with connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT user_id FROM subscriptions
+                    WHERE status = 'active'
+                      AND (expires_at IS NULL OR expires_at > ?)
+                    """,
+                    (now,),
+                ).fetchall()
         recipients.update(str(row["user_id"]) for row in rows)
         return sorted(recipients)
 
@@ -671,20 +733,39 @@ class SubscriptionRepository:
             raise ValueError(f"Unknown subscription plan: {plan_id}")
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat()
+        store = SupabaseStore()
+        if store.enabled:
+            current = store.select_one("subscriptions", {"select": "*", "user_id": f"eq.{user_id}"})
+            expires_at = self._next_expires_at(current, plan["duration_days"], now_dt)
+            store.upsert(
+                "subscriptions",
+                {
+                    "user_id": str(user_id),
+                    "plan_id": plan_id,
+                    "status": "active",
+                    "started_at": now,
+                    "expires_at": expires_at,
+                    "updated_at": now,
+                },
+                on_conflict="user_id",
+            )
+            store.insert(
+                "subscription_payments",
+                {
+                    "user_id": str(user_id),
+                    "plan_id": plan_id,
+                    "payload": payload,
+                    "currency": currency,
+                    "total_amount": total_amount,
+                    "telegram_payment_charge_id": telegram_payment_charge_id,
+                    "provider_payment_charge_id": provider_payment_charge_id,
+                    "created_at": now,
+                },
+            )
+            return self.get(user_id)
         with connect() as conn:
             current = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
-            if plan["duration_days"] is None:
-                expires_at = None
-            else:
-                base = now_dt
-                if current and current["expires_at"]:
-                    try:
-                        parsed = datetime.fromisoformat(current["expires_at"])
-                        if parsed > now_dt:
-                            base = parsed
-                    except ValueError:
-                        pass
-                expires_at = (base + timedelta(days=plan["duration_days"])).isoformat()
+            expires_at = self._next_expires_at(current, plan["duration_days"], now_dt)
             conn.execute(
                 """
                 INSERT INTO subscriptions (user_id, plan_id, status, started_at, expires_at, updated_at)
@@ -721,21 +802,49 @@ class SubscriptionRepository:
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat()
         expires_at: str | None
+        store = SupabaseStore()
+        if store.enabled:
+            current = store.select_one("subscriptions", {"select": "*", "user_id": f"eq.{user_id}"})
+            if days is None:
+                expires_at = None
+                plan_id = "manual_forever"
+            else:
+                expires_at = self._next_expires_at(current, days, now_dt)
+                plan_id = "manual"
+            payload = f"admin_grant:{granted_by or 'unknown'}:{user_id}:{int(now_dt.timestamp())}"
+            store.upsert(
+                "subscriptions",
+                {
+                    "user_id": str(user_id),
+                    "plan_id": plan_id,
+                    "status": "active",
+                    "started_at": now,
+                    "expires_at": expires_at,
+                    "updated_at": now,
+                },
+                on_conflict="user_id",
+            )
+            store.insert(
+                "subscription_payments",
+                {
+                    "user_id": str(user_id),
+                    "plan_id": plan_id,
+                    "payload": payload,
+                    "currency": "ADMIN",
+                    "total_amount": 0,
+                    "telegram_payment_charge_id": None,
+                    "provider_payment_charge_id": None,
+                    "created_at": now,
+                },
+            )
+            return self.get(user_id)
         with connect() as conn:
             current = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (str(user_id),)).fetchone()
             if days is None:
                 expires_at = None
                 plan_id = "manual_forever"
             else:
-                base = now_dt
-                if current and current["status"] == "active" and current["expires_at"]:
-                    try:
-                        parsed = datetime.fromisoformat(current["expires_at"])
-                        if parsed > now_dt:
-                            base = parsed
-                    except ValueError:
-                        pass
-                expires_at = (base + timedelta(days=days)).isoformat()
+                expires_at = self._next_expires_at(current, days, now_dt)
                 plan_id = "manual"
             payload = f"admin_grant:{granted_by or 'unknown'}:{user_id}:{int(now_dt.timestamp())}"
             conn.execute(
@@ -763,6 +872,21 @@ class SubscriptionRepository:
 
     def revoke(self, user_id: int | str) -> dict:
         now = utc_now()
+        store = SupabaseStore()
+        if store.enabled:
+            store.upsert(
+                "subscriptions",
+                {
+                    "user_id": str(user_id),
+                    "plan_id": "manual",
+                    "status": "revoked",
+                    "started_at": now,
+                    "expires_at": now,
+                    "updated_at": now,
+                },
+                on_conflict="user_id",
+            )
+            return self.get(user_id)
         with connect() as conn:
             conn.execute(
                 """
@@ -776,3 +900,31 @@ class SubscriptionRepository:
                 (str(user_id), now, now, now),
             )
         return self.get(user_id)
+
+    def _next_expires_at(self, current: dict | object | None, duration_days: int | None, now_dt: datetime) -> str | None:
+        if duration_days is None:
+            return None
+        base = now_dt
+        current_status = self._row_value(current, "status")
+        current_expires_at = self._row_value(current, "expires_at")
+        if current_expires_at and (current_status in {None, "active"}):
+            try:
+                parsed = datetime.fromisoformat(str(current_expires_at).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                parsed = parsed.astimezone(timezone.utc)
+                if parsed > now_dt:
+                    base = parsed
+            except ValueError:
+                pass
+        return (base + timedelta(days=duration_days)).isoformat()
+
+    def _row_value(self, row: dict | object | None, key: str) -> object | None:
+        if not row:
+            return None
+        if isinstance(row, dict):
+            return row.get(key)
+        try:
+            return row[key]  # type: ignore[index]
+        except (KeyError, TypeError, IndexError):
+            return None
