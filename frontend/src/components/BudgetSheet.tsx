@@ -89,7 +89,7 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
             <div className="budget-gift-topbar">
               <button onClick={() => setGiftPickerOpen(false)}>‹</button>
             </div>
-            <label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
+            <label className="search"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
             <div className="budget-table-head">
               <button onClick={toggleAllVisible}>Выбрать все</button>
               <button className="sort-button" onClick={() => toggleSort('floor')}>Флор{sortLabel(sort, 'floor')}</button>
@@ -108,7 +108,7 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
                     </span>
                     <small className="floor">{formatTon(item.floorPrice ?? undefined)}</small>
                     <small className="floor hot">{formatTurnover(item.volume ?? undefined)}</small>
-                    <i className={selected ? 'check active' : 'check'}>{selected ? '✓' : ''}</i>
+                    <i className={selected ? 'check active' : 'check'} />
                   </button>
                 );
               })}
@@ -136,7 +136,7 @@ function GiftIcon({ item, index }: { item: NftCatalogItem; index: number }) {
 }
 
 function formatTon(value?: number) {
-  return value ? `◆ ${value.toFixed(value >= 10 ? 1 : 2)}` : '—';
+  return value ? `${value.toFixed(value >= 10 ? 1 : 2)} TON` : '—';
 }
 
 function formatTurnover(value?: number) {

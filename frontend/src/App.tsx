@@ -176,23 +176,23 @@ export function App() {
                 <h1>Лоты</h1>
               </div>
             </div>
-            <div className="meter-row"><span>📋 Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
+            <div className="meter-row"><span><UiIcon name="list" /> Листинг: {items.length} / 500</span><i style={{ width: `${Math.min(items.length / 5, 100)}%` }} /></div>
             <div className="budget-row">
               <span>{budgetSummary(filters)}</span>
               <small>{activeFilterCount ? `${activeFilterCount} фильтра` : 'Все подарки'}</small>
             </div>
             <div className="listing-tools" aria-label="Настройки листинга">
               <button onClick={() => setBudgetOpen(true)}>
-                <span>₮</span>
+                <span><UiIcon name="sliders" /></span>
                 <b>Бюджет</b>
               </button>
               <button onClick={() => setPickerOpen(true)}>
-                <span>◇</span>
+                <span><UiIcon name="gift" /></span>
                 <b>Подарок</b>
               </button>
             </div>
             <label className="top-search">
-              <span>⌕</span>
+              <span><UiIcon name="search" /></span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
             </label>
           </section>
@@ -217,7 +217,7 @@ export function App() {
           setPickerOpen(false);
           setActivePage('listing');
         }}>
-          <span>L</span>
+          <span><UiIcon name="grid" /></span>
           <b>Листинги</b>
         </button>
         <button aria-label="Профиль" className={activePage === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
@@ -225,7 +225,7 @@ export function App() {
           setPickerOpen(false);
           setActivePage('profile');
         }}>
-          <span>✓</span>
+          <span><UiIcon name="user" /></span>
           <b>Профиль</b>
         </button>
       </nav>
@@ -239,6 +239,65 @@ export function App() {
       )}
 
     </main>
+  );
+}
+
+function UiIcon({ name }: { name: 'list' | 'sliders' | 'gift' | 'search' | 'grid' | 'user' }) {
+  const paths = {
+    list: (
+      <>
+        <path d="M8 6h10" />
+        <path d="M8 12h10" />
+        <path d="M8 18h10" />
+        <path d="M4 6h.01" />
+        <path d="M4 12h.01" />
+        <path d="M4 18h.01" />
+      </>
+    ),
+    sliders: (
+      <>
+        <path d="M4 7h10" />
+        <path d="M18 7h2" />
+        <path d="M4 17h2" />
+        <path d="M10 17h10" />
+        <circle cx="16" cy="7" r="2" />
+        <circle cx="8" cy="17" r="2" />
+      </>
+    ),
+    gift: (
+      <>
+        <path d="M4 10h16v10H4z" />
+        <path d="M12 10v10" />
+        <path d="M4 14h16" />
+        <path d="M7.5 10C5.8 8.6 6 6 8.2 6c1.7 0 2.8 2 3.8 4" />
+        <path d="M16.5 10C18.2 8.6 18 6 15.8 6c-1.7 0-2.8 2-3.8 4" />
+      </>
+    ),
+    search: (
+      <>
+        <circle cx="11" cy="11" r="6" />
+        <path d="m16 16 4 4" />
+      </>
+    ),
+    grid: (
+      <>
+        <path d="M4 4h7v7H4z" />
+        <path d="M13 4h7v7h-7z" />
+        <path d="M4 13h7v7H4z" />
+        <path d="M13 13h7v7h-7z" />
+      </>
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M5 20c1.4-4 12.6-4 14 0" />
+      </>
+    ),
+  };
+  return (
+    <svg className="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+      {paths[name]}
+    </svg>
   );
 }
 

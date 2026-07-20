@@ -1308,6 +1308,44 @@ mark {
   line-height: 1;
 }
 
+.ui-icon {
+  width: 17px;
+  height: 17px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.meter-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.meter-row .ui-icon {
+  width: 18px;
+  height: 18px;
+  color: #bdbdbd;
+}
+
+.listing-tools .ui-icon,
+.nav-button .ui-icon,
+.top-search .ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.check.active::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #050505;
+}
+
 .picker-panel {
   display: flex;
   flex-direction: column;

@@ -40,7 +40,7 @@ export function FilterSheet({ type, catalog, collectionImages, imagePool, select
           <h2>{titles[type]}</h2>
           <button onClick={onClose}>×</button>
         </header>
-        <label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
+        <label className="search"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" /></label>
         {type === 'nfts' && <div className="table-head"><b>Выбрать все</b><span>Флор</span><span>Оборот</span><i /></div>}
         {type !== 'nfts' && <div className="select-all"><button onClick={() => setDraft(allSelected ? [] : Array.from(new Set([...draft, ...allNames])))}>Выбрать все</button><i /></div>}
 
@@ -56,9 +56,9 @@ export function FilterSheet({ type, catalog, collectionImages, imagePool, select
                 {type === 'nfts' && <small>23 июн.</small>}
               </span>
               {'rarity' in item && <mark>{item.rarity}%</mark>}
-              {'floorPrice' in item && <small className="floor">◆ {item.floorPrice}</small>}
-              {type === 'nfts' && <><small className="floor hot">◆ {sampleFloor(index)}</small><small className="floor">◆ {sampleVolume(index)}</small></>}
-              <i className={draft.includes(item.name) ? 'check active' : 'check'}>{draft.includes(item.name) ? '✓' : ''}</i>
+              {'floorPrice' in item && <small className="floor">{item.floorPrice} TON</small>}
+              {type === 'nfts' && <><small className="floor hot">{sampleFloor(index)} TON</small><small className="floor">{sampleVolume(index)}</small></>}
+              <i className={draft.includes(item.name) ? 'check active' : 'check'} />
             </button>
           ))}
         </div>
