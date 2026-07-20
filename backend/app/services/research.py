@@ -298,7 +298,9 @@ class ResearchService:
             return []
         interval = max(int(self.mrkt.settings.research_interval_seconds), 1)
         offset = int(datetime.now(timezone.utc).timestamp() // interval) % len(clean)
-        return clean[offset:] + clean[:offset]
+        rotated = clean[offset:] + clean[:offset]
+        limit = max(1, int(self.mrkt.settings.mrkt_collections_per_run or 0))
+        return rotated[:limit]
 
     def _collection_counts(self, listings: list[dict]) -> dict[str, int]:
         counts: dict[str, int] = {}

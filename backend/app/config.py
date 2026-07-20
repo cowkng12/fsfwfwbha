@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     mrkt_min_gift_floor: float = 0
     mrkt_auth_cooldown_seconds: int = 21600
     mrkt_request_delay_seconds: float = 2.0
+    mrkt_collections_per_run: int = 6
     listings_retention_hours: int = 72
     mrkt_premium_backdrops: str = (
         "Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,"
