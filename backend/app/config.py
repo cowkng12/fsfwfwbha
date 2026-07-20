@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     mrkt_model_sales_max_age_days: int = 7
     mrkt_min_gift_floor: float = 0
     mrkt_auth_cooldown_seconds: int = 21600
-    mrkt_request_delay_seconds: float = 1.0
+    mrkt_request_delay_seconds: float = 2.0
     listings_retention_hours: int = 72
     mrkt_premium_backdrops: str = (
         "Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,"
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         "Violet,White,Coral,Rose Gold,Peach,Teal,Navy Blue,Olive,Bronze,Lilac,Sea Foam,"
         "Cloud White,Sunset Orange"
     )
-    research_interval_seconds: int = 120
+    research_interval_seconds: int = 300
     keepalive_interval_seconds: int = 240
 
     telegram_api_id: int | None = None

@@ -30,11 +30,11 @@ services:
       - key: MRKT_AUTH_COOLDOWN_SECONDS
         value: 21600
       - key: MRKT_REQUEST_DELAY_SECONDS
-        value: 1.0
+        value: 2.0
       - key: MRKT_PREMIUM_BACKDROPS
         value: Amber,Aquamarine,Azure Blue,Battleship Grey,Black,Burgundy,Carmine,Celtic Blue,Chestnut,Chocolate,Cobalt Blue,Copper,Crimson,Cyberpunk,Dark Green,Dark Lilac,Deep Cyan,Desert Sand,Electric Indigo,Electric Purple,Emerald,English Violet,Fandango,Feldgrau,Fire Engine,French Blue,French Violet,Fuchsia,Gold,Gunmetal,Hunter Green,Indigo Dye,Lavender,Magenta,Malachite,Midnight Blue,Mint Green,Mustard,Mystic Pearl,Neon Blue,Onyx Black,Orange,Pacific Green,Platinum,Pure Gold,Purple,Ruby,Sapphire,Satin Gold,Shamrock Green,Silver,Sky Blue,Steel Grey,Turquoise,Violet,White,Coral,Rose Gold,Peach,Teal,Navy Blue,Olive,Bronze,Lilac,Sea Foam,Cloud White,Sunset Orange
       - key: RESEARCH_INTERVAL_SECONDS
-        value: 180
+        value: 300
       - key: KEEPALIVE_INTERVAL_SECONDS
         value: 240
       - key: PUBLIC_BASE_URL
