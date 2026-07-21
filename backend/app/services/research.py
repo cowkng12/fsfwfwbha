@@ -166,16 +166,25 @@ class GiftTableParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.rows: dict[str, str] = {}
+        self.links: dict[str, str] = {}
         self._row: list[str] = []
+        self._row_links: list[str] = []
         self._capture: str | None = None
         self._text: list[str] = []
+        self._link: str | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "tr":
             self._row = []
+            self._row_links = []
         if tag in {"th", "td"}:
             self._capture = tag
             self._text = []
+            self._link = None
+        if tag == "a" and self._capture == "td":
+            href = dict(attrs).get("href")
+            if href:
+                self._link = href
 
     def handle_data(self, data: str) -> None:
         if self._capture:
@@ -185,10 +194,15 @@ class GiftTableParser(HTMLParser):
         if tag in {"th", "td"} and self._capture == tag:
             value = " ".join("".join(self._text).split())
             self._row.append(value)
+            self._row_links.append(self._link or "")
             self._capture = None
             self._text = []
+            self._link = None
         if tag == "tr" and len(self._row) >= 2:
-            self.rows[self._row[0].lower()] = self._row[1]
+            key = self._row[0].lower()
+            self.rows[key] = self._row[1]
+            if len(self._row_links) >= 2 and self._row_links[1]:
+                self.links[key] = self._row_links[1]
 
 
 class ResearchService:
@@ -928,11 +942,16 @@ class ResearchService:
         model: str | None,
         client: TelegramClient | None,
     ) -> list[dict[str, Any]]:
-        if not collection or not model or not client:
+        if not collection or not model:
             return []
         key = (collection, model)
         if key in self._model_sales_cache:
             return self._model_sales_cache[key]
+        if client:
+            sales = await self._model_recent_sales_from_telegram(collection, model, client)
+            if sales:
+                self._model_sales_cache[key] = sales[:MODEL_RECENT_SALES_LIMIT]
+                return self._model_sales_cache[key]
         try:
             gifts = await self.mrkt.saling(
                 [collection],
@@ -954,11 +973,13 @@ class ResearchService:
             if not number or not slug or slug in seen:
                 continue
             seen.add(slug)
-            try:
-                value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
-            except Exception:
-                continue
-            date = self._iso_datetime(getattr(value_info, "last_sale_date", None))
+            date = self._gift_sale_date(gift)
+            if client:
+                try:
+                    value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
+                except Exception:
+                    value_info = None
+                date = self._iso_datetime(getattr(value_info, "last_sale_date", None)) if value_info else date
             price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
             if not date or price is None:
                 continue
@@ -967,6 +988,94 @@ class ResearchService:
         sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         self._model_sales_cache[key] = sales[:MODEL_RECENT_SALES_LIMIT]
         return self._model_sales_cache[key]
+
+    async def _model_recent_sales_from_telegram(
+        self,
+        collection: str,
+        model: str,
+        client: TelegramClient,
+    ) -> list[dict[str, Any]]:
+        try:
+            sample = await self.mrkt.saling([collection], model_names=[model], count=1, use_default_max_price=False)
+        except Exception:
+            sample = []
+        number = str(self._deep_pick(sample[0], "number", "giftNumber", "num", "gift_num", "giftNum") or "") if sample else ""
+        url = self._telegram_url_from_gift(sample[0], number or None) if sample else None
+        url = url or self._telegram_url(collection, number or None)
+        slug = self._telegram_slug(url)
+        if not slug:
+            return []
+        try:
+            unique = await client(functions.payments.GetUniqueStarGiftRequest(slug=slug))
+        except Exception:
+            return []
+        gift = getattr(unique, "gift", None)
+        gift_id = getattr(gift, "gift_id", None)
+        model_document_id = self._unique_model_document_id(gift)
+        if not gift_id or not model_document_id:
+            return []
+        try:
+            resale = await client(functions.payments.GetResaleStarGiftsRequest(
+                gift_id=gift_id,
+                offset="",
+                limit=MODEL_SALE_SAMPLE_SIZE,
+                sort_by_price=True,
+                attributes=[types.StarGiftAttributeIdModel(document_id=model_document_id)],
+            ))
+        except Exception:
+            return []
+
+        sales: list[dict[str, Any]] = []
+        for resale_gift in getattr(resale, "gifts", []) or []:
+            slug = getattr(resale_gift, "slug", None)
+            number = str(getattr(resale_gift, "num", "") or "")
+            price = self._resale_ton_price(resale_gift)
+            if not slug or not number or price is None:
+                continue
+            try:
+                value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
+            except Exception:
+                value_info = None
+            date = self._iso_datetime(getattr(value_info, "last_sale_date", None)) if value_info else None
+            if not date:
+                continue
+            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date})
+        sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        return sales
+
+    def _unique_model_document_id(self, gift: Any) -> int | None:
+        for attribute in getattr(gift, "attributes", []) or []:
+            if isinstance(attribute, types.StarGiftAttributeModel):
+                document_id = getattr(getattr(attribute, "document", None), "id", None)
+                if document_id:
+                    return int(document_id)
+        return None
+
+    def _resale_ton_price(self, gift: Any) -> float | None:
+        for amount in getattr(gift, "resell_amount", []) or []:
+            if isinstance(amount, types.StarsTonAmount):
+                return round(float(getattr(amount, "amount", 0)) / 1_000_000_000, 4)
+        return None
+
+    def _gift_sale_date(self, gift: dict[str, Any]) -> str | None:
+        value = self._deep_pick(
+            gift,
+            "lastSaleDate",
+            "last_sale_date",
+            "lastSoldAt",
+            "last_sold_at",
+            "saleDate",
+            "sale_date",
+            "soldAt",
+            "sold_at",
+            "updatedAt",
+            "updated_at",
+            "listedAt",
+            "listed_at",
+            "createdAt",
+            "created_at",
+        )
+        return self._iso_datetime(value)
 
     def _has_recent_model_sale(self, listing: dict) -> bool:
         max_age_days = self.mrkt.settings.mrkt_model_sales_max_age_days
@@ -1036,6 +1145,7 @@ class ResearchService:
         parser = GiftTableParser()
         parser.feed(response.text)
         owner = parser.rows.get("owner")
+        owner = self._telegram_username(parser.links.get("owner")) or owner
         if owner:
             listing["current_owner"] = owner
 
@@ -1099,6 +1209,12 @@ class ResearchService:
         if not url:
             return None
         return url.rstrip("/").rsplit("/", 1)[-1] or None
+
+    def _telegram_username(self, url: str | None) -> str | None:
+        if not url:
+            return None
+        match = re.search(r"(?:https?://)?(?:t\.me|telegram\.me)/([A-Za-z0-9_]{5,32})(?:[/?#].*)?$", url)
+        return f"@{match.group(1)}" if match else None
 
     def _peer_display(self, peer: Any, users: list[Any], chats: list[Any]) -> str | None:
         if isinstance(peer, types.PeerUser):
