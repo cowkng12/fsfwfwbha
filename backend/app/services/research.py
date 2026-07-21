@@ -167,6 +167,7 @@ class GiftTableParser(HTMLParser):
         super().__init__()
         self.rows: dict[str, str] = {}
         self.links: dict[str, str] = {}
+        self.text_parts: list[str] = []
         self._row: list[str] = []
         self._row_links: list[str] = []
         self._capture: str | None = None
@@ -187,6 +188,9 @@ class GiftTableParser(HTMLParser):
                 self._link = href
 
     def handle_data(self, data: str) -> None:
+        text = " ".join(data.split())
+        if text:
+            self.text_parts.append(text)
         if self._capture:
             self._text.append(data)
 
@@ -203,6 +207,10 @@ class GiftTableParser(HTMLParser):
             self.rows[key] = self._row[1]
             if len(self._row_links) >= 2 and self._row_links[1]:
                 self.links[key] = self._row_links[1]
+
+    @property
+    def text(self) -> str:
+        return " ".join(self.text_parts)
 
 
 class ResearchService:
@@ -1143,10 +1151,17 @@ class ResearchService:
             return
         parser = GiftTableParser()
         parser.feed(response.text)
-        owner = parser.rows.get("owner")
+        details = self._public_gift_details(parser.text)
+        owner = parser.rows.get("owner") or details.get("owner")
         owner = self._telegram_username(parser.links.get("owner")) or owner
         if owner:
             listing["current_owner"] = owner
+        if details.get("sender") and not listing.get("original_sender"):
+            listing["original_sender"] = details["sender"]
+        if details.get("recipient") and not listing.get("original_recipient"):
+            listing["original_recipient"] = details["recipient"]
+        if details.get("gifted_at") and not listing.get("original_gift_at"):
+            listing["original_gift_at"] = details["gifted_at"]
 
     async def _telegram_client(self) -> TelegramClient | None:
         settings = self.mrkt.settings
@@ -1219,6 +1234,44 @@ class ResearchService:
             return None
         match = re.search(r"(?:https?://)?(?:t\.me|telegram\.me)/([A-Za-z0-9_]{5,32})(?:[/?#].*)?$", url)
         return f"@{match.group(1)}" if match else None
+
+    def _public_gift_details(self, text: str) -> dict[str, str]:
+        details: dict[str, str] = {}
+        normalized = " ".join(text.split())
+        if not normalized:
+            return details
+        gifted_match = re.search(
+            r"Gifted by\s+(.+?)\s+to\s+(.+?)\s+on\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+            normalized,
+        )
+        if gifted_match:
+            details["sender"] = self._public_person(gifted_match.group(1))
+            details["recipient"] = self._public_person(gifted_match.group(2))
+            gifted_at = self._public_date(gifted_match.group(3))
+            if gifted_at:
+                details["gifted_at"] = gifted_at
+        owner_match = re.search(
+            r"\bOwner\s+(.+?)\s+(?:Model|Backdrop|Symbol|Quantity|Gifted by|This NFT|View Collectible)\b",
+            normalized,
+        )
+        if owner_match:
+            details["owner"] = self._public_person(owner_match.group(1))
+        return {key: value for key, value in details.items() if value}
+
+    def _public_person(self, value: str) -> str:
+        text = " ".join(value.split()).strip(" .,:;")
+        if not text:
+            return ""
+        username = re.search(r"@?([A-Za-z0-9_]{5,32})$", text)
+        if username and text.lower() == username.group(1).lower():
+            return f"@{username.group(1)}"
+        return text
+
+    def _public_date(self, value: str) -> str | None:
+        try:
+            return datetime.strptime(value, "%d %B %Y").replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            return None
 
     def _peer_display(self, peer: Any, users: list[Any], chats: list[Any]) -> str | None:
         if isinstance(peer, types.PeerUser):

@@ -606,7 +606,15 @@ class TelegramBotService:
             platform = sale.get("platform") or "MRKT"
             date = sale.get("date") or ""
             parts.append(f"#{number} за {price} TON на {platform} - {self._format_days_ago(date)}")
-        return "\n".join(parts) if parts else "Нет свежих продаж модели"
+        if parts:
+            return "\n".join(parts)
+        if listing.last_sale_at and listing.last_sale_price is not None:
+            price = self._format_sale_ton(listing.last_sale_price)
+            number = listing.number or "-"
+            return f"#{number} за {price} TON - {self._format_days_ago(listing.last_sale_at)}"
+        if listing.sales_count:
+            return f"Продаж у подарка: {self._format_int(listing.sales_count)}"
+        return "Нет свежих продаж модели"
 
     def _format_sale_ton(self, value: float | int | str | None) -> str:
         if value is None:
