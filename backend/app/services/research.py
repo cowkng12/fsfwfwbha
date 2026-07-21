@@ -1037,8 +1037,7 @@ class ResearchService:
             except Exception:
                 value_info = None
             date = self._iso_datetime(getattr(value_info, "last_sale_date", None)) if value_info else None
-            if not date:
-                continue
+            date = date or datetime.now(timezone.utc).isoformat()
             sales.append({"number": number, "price": price, "platform": "MRKT", "date": date})
         sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return sales
@@ -1171,11 +1170,10 @@ class ResearchService:
             return
         try:
             unique = await client(functions.payments.GetUniqueStarGiftRequest(slug=slug))
-            value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
         except Exception:
-            return
+            unique = None
 
-        gift = getattr(unique, "gift", None)
+        gift = getattr(unique, "gift", None) if unique else None
         if gift:
             uses_count = self._int_value(getattr(gift, "availability_issued", None))
             uses_total = self._int_value(getattr(gift, "availability_total", None))
@@ -1196,6 +1194,12 @@ class ResearchService:
                         listing["original_recipient"] = recipient
                     listing["original_gift_at"] = self._iso_datetime(getattr(attribute, "date", None))
 
+        try:
+            value_info = await client(functions.payments.GetUniqueStarGiftValueInfoRequest(slug=slug))
+        except Exception:
+            value_info = None
+        if not value_info:
+            return
         currency = getattr(value_info, "currency", None)
         listing["last_sale_at"] = self._iso_datetime(getattr(value_info, "last_sale_date", None))
         listing["last_sale_price"] = self._currency_amount(getattr(value_info, "last_sale_price", None), currency)

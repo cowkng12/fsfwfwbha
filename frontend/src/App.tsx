@@ -32,6 +32,21 @@ type TelegramUser = {
   photo_url?: string;
 };
 
+type SubscriptionOption = {
+  id: 'day' | 'week' | 'month' | 'forever';
+  title: string;
+  messageLine: string;
+  price: string;
+  caption: string;
+};
+
+const SUBSCRIPTION_OPTIONS: SubscriptionOption[] = [
+  { id: 'day', title: 'На день', messageLine: 'На день', price: '500р / 4$', caption: 'Быстро попробовать ресерч' },
+  { id: 'week', title: 'На неделю', messageLine: 'На неделю', price: '2500р / 30$', caption: 'Для плотного поиска' },
+  { id: 'month', title: 'На месяц', messageLine: 'На месяц', price: '4000р / 50$', caption: 'Оптимально для работы' },
+  { id: 'forever', title: 'Навсегда', messageLine: 'Навсегда', price: '10000р / 150$', caption: 'Один раз и без продлений' },
+];
+
 export function App() {
   const [items, setItems] = useState<Listing[]>([]);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -315,6 +330,7 @@ function ProfilePage({
   status: SubscriptionStatus | null;
   user: TelegramUser | null;
 }) {
+  const [plansOpen, setPlansOpen] = useState(false);
   const currentPlan = status?.plans.find((plan) => plan.id === status.plan_id);
   const daysLeft = subscriptionDaysLeft(status);
   const action = status?.active ? 'renew' : 'buy';
@@ -341,9 +357,31 @@ function ProfilePage({
         {daysLeft !== null && <span>До окончания вашей подписки осталось {daysWord(daysLeft)}</span>}
         {!status?.active && <span>Оформи подписку, чтобы начать поиск</span>}
       </div>
-      <button className="contact-button" onClick={() => openSubscriptionContact(action)}>
-        {status?.active ? 'Продлить' : 'Приобрести подписку'}
+      <button className="contact-button" onClick={() => setPlansOpen(true)}>
+        {status?.active ? 'Продлить подписку' : 'Купить подписку'}
       </button>
+      {plansOpen && (
+        <div className="subscription-sheet" role="dialog" aria-modal="true" aria-label="Выбор подписки" onClick={() => setPlansOpen(false)}>
+          <section className="subscription-panel subscription-menu" onClick={(event) => event.stopPropagation()}>
+            <button className="sheet-close" onClick={() => setPlansOpen(false)} aria-label="Закрыть">×</button>
+            <h2>Выбери подписку</h2>
+            <div className="plan-list profile-plan-list">
+              {SUBSCRIPTION_OPTIONS.map((option) => (
+                <button className="plan-item subscription-plan-card" key={option.id} onClick={() => {
+                  setPlansOpen(false);
+                  openSubscriptionContact(action, option);
+                }}>
+                  <span>
+                    <b>{option.title}</b>
+                    <small>{option.caption}</small>
+                  </span>
+                  <strong>{option.price}</strong>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
@@ -361,8 +399,8 @@ function getTelegramUser(): TelegramUser | null {
   return webApp?.initDataUnsafe?.user ?? null;
 }
 
-function openSubscriptionContact(action: 'buy' | 'renew') {
-  const text = subscriptionMessage(action);
+function openSubscriptionContact(action: 'buy' | 'renew', option?: SubscriptionOption) {
+  const text = subscriptionMessage(action, option);
   navigator.clipboard?.writeText(text).catch(() => undefined);
   const url = `https://t.me/diamondilya?text=${encodeURIComponent(text)}`;
   const webApp = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
@@ -377,11 +415,11 @@ function openSubscriptionContact(action: 'buy' | 'renew') {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-function subscriptionMessage(action: 'buy' | 'renew') {
+function subscriptionMessage(action: 'buy' | 'renew', option?: SubscriptionOption) {
   return [
     '#подписка',
     action === 'buy' ? 'Привет, хочу купить подписку' : 'Привет, хочу продлить подписку',
-    'На день/неделю/месяц/навсегда',
+    option?.messageLine ?? 'На день/неделю/месяц/навсегда',
   ].join('\n');
 }
 

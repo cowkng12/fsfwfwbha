@@ -127,7 +127,7 @@ async def catalog(_: int = Depends(require_telegram_user_id), client=Depends(mrk
         collections = []
     if not collections:
         return base_catalog
-    return {**base_catalog, "nfts": collections}
+    return {**base_catalog, "nfts": merge_catalog_collections(base_catalog.get("nfts", []), collections)}
 
 
 @router.get("/catalog/traits")
@@ -183,6 +183,36 @@ def normalize_gift_collections(items: list[dict]) -> list[dict]:
     return sorted(collections.values(), key=lambda item: item["name"].lower())
 
 
+def merge_catalog_collections(base_items: list[dict], live_items: list[dict]) -> list[dict]:
+    merged: dict[str, dict] = {}
+    for item in base_items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        merged[name.lower()] = {
+            "id": str(item.get("id") or name),
+            "name": name,
+            "image": str(item.get("image") or ""),
+            "floorPrice": item.get("floorPrice"),
+            "volume": item.get("volume"),
+            "searchNames": item.get("searchNames") or [name],
+        }
+    for item in live_items:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        existing = merged.get(key, {})
+        merged[key] = {
+            **existing,
+            **item,
+            "searchNames": item.get("searchNames") or existing.get("searchNames") or [name],
+        }
+    return sorted(merged.values(), key=lambda item: item["name"].lower())
+
+
 def normalize_gift_collection(item: dict) -> dict:
     if not isinstance(item, dict):
         name = str(item or "").strip()
@@ -210,7 +240,7 @@ def normalize_gift_collection(item: dict) -> dict:
         "image": cdn_url(logo),
         "floorPrice": collection_floor_ton(item),
         "volume": collection_volume_ton(item),
-        "searchNames": [name] if name else [],
+        "searchNames": item.get("searchNames") or ([name] if name else []),
     }
 
 
