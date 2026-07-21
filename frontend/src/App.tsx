@@ -11,7 +11,6 @@ import {
 } from './api';
 import type { Catalog, FilterState, Listing, SubscriptionPlan, SubscriptionStatus } from './types';
 import { ResultGrid } from './components/ResultGrid';
-import { GiftPickerSheet } from './components/GiftPickerSheet';
 import { BudgetSheet } from './components/BudgetSheet';
 
 const DEFAULT_BUDGET = '10';
@@ -42,7 +41,6 @@ export function App() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>('listing');
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
@@ -120,23 +118,10 @@ export function App() {
       .includes(normalized));
   }, [items, query]);
 
-  const symbols = useMemo(() => {
-    const values = [...items.map((item) => item.symbol_name), ...filters.symbols]
-      .filter((value): value is string => Boolean(value));
-    return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-  }, [items, filters.symbols]);
-
   const activeFilterCount = [filters.nfts, filters.models, filters.symbols, filters.backdrops]
     .filter((value) => value.length > 0).length
     + [filters.number, filters.minPrice].filter(Boolean).length
     + (filters.maxPrice && filters.maxPrice !== DEFAULT_BUDGET ? 1 : 0);
-
-  const applyFilters = (nextFilters: FilterState) => {
-    const normalized = normalizeFilters({ ...nextFilters, maxPrice: nextFilters.maxPrice || DEFAULT_BUDGET });
-    setFilters(normalized);
-    setPickerOpen(false);
-    saveSearchPreferences(normalized).catch((error) => console.error(error));
-  };
 
   const applyBudget = (nextFilters: FilterState) => {
     const normalized = normalizeFilters(nextFilters);
@@ -184,11 +169,7 @@ export function App() {
             <div className="listing-tools" aria-label="Настройки листинга">
               <button onClick={() => setBudgetOpen(true)}>
                 <span><UiIcon name="sliders" /></span>
-                <b>Бюджет</b>
-              </button>
-              <button onClick={() => setPickerOpen(true)}>
-                <span><UiIcon name="gift" /></span>
-                <b>Подарок</b>
+                <b>Фильтры</b>
               </button>
             </div>
             <label className="top-search">
@@ -211,10 +192,9 @@ export function App() {
         <ProfilePage status={subscription} user={telegramUser} />
       )}
 
-      <nav className={pickerOpen || budgetOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
+      <nav className={budgetOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
         <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
-          setPickerOpen(false);
           setActivePage('listing');
         }}>
           <span><UiIcon name="grid" /></span>
@@ -222,17 +202,12 @@ export function App() {
         </button>
         <button aria-label="Профиль" className={activePage === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
-          setPickerOpen(false);
           setActivePage('profile');
         }}>
           <span><UiIcon name="user" /></span>
           <b>Профиль</b>
         </button>
       </nav>
-
-      {pickerOpen && catalog && (
-        <GiftPickerSheet catalog={catalog} filters={filters} symbols={symbols} onClose={() => setPickerOpen(false)} onApply={applyFilters} />
-      )}
 
       {budgetOpen && catalog && (
         <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
@@ -242,7 +217,7 @@ export function App() {
   );
 }
 
-function UiIcon({ name }: { name: 'list' | 'sliders' | 'gift' | 'search' | 'grid' | 'user' }) {
+function UiIcon({ name }: { name: 'list' | 'sliders' | 'search' | 'grid' | 'user' }) {
   const paths = {
     list: (
       <>
@@ -262,15 +237,6 @@ function UiIcon({ name }: { name: 'list' | 'sliders' | 'gift' | 'search' | 'grid
         <path d="M10 17h10" />
         <circle cx="16" cy="7" r="2" />
         <circle cx="8" cy="17" r="2" />
-      </>
-    ),
-    gift: (
-      <>
-        <path d="M4 10h16v10H4z" />
-        <path d="M12 10v10" />
-        <path d="M4 14h16" />
-        <path d="M7.5 10C5.8 8.6 6 6 8.2 6c1.7 0 2.8 2 3.8 4" />
-        <path d="M16.5 10C18.2 8.6 18 6 15.8 6c-1.7 0-2.8 2-3.8 4" />
       </>
     ),
     search: (
@@ -302,10 +268,10 @@ function UiIcon({ name }: { name: 'list' | 'sliders' | 'gift' | 'search' | 'grid
 }
 
 function budgetSummary(filters: FilterState) {
-  if (filters.minPrice && filters.maxPrice) return `Бюджет: ${filters.minPrice}-${filters.maxPrice} TON`;
-  if (filters.minPrice) return `Бюджет: от ${filters.minPrice} TON`;
-  if (filters.maxPrice) return `Бюджет: до ${filters.maxPrice} TON`;
-  return 'Бюджет: без лимита';
+  if (filters.minPrice && filters.maxPrice) return `Лимит: ${filters.minPrice}-${filters.maxPrice} TON`;
+  if (filters.minPrice) return `Лимит: от ${filters.minPrice} TON`;
+  if (filters.maxPrice) return `Лимит: до ${filters.maxPrice} TON`;
+  return 'Лимит: без ограничений';
 }
 
 function readStoredFilters(): FilterState {

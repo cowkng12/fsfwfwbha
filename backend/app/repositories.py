@@ -539,16 +539,22 @@ class SearchPreferencesRepository:
                 saved[str(row["user_id"])] = self._normalize(json.loads(row["filters_json"]), updated_at=row["updated_at"])
             except json.JSONDecodeError:
                 continue
-        return [
-            {
+        preferences: list[dict] = []
+        for user_id in recipients:
+            saved_filters = saved.get(str(user_id))
+            if not saved_filters:
+                continue
+            alert_filters = self._alert_filters(saved_filters)
+            if not alert_filters["collection_names"]:
+                continue
+            preferences.append({
                 "user_id": str(user_id),
-                **self._alert_filters(saved.get(str(user_id)) or self._default()),
-            }
-            for user_id in recipients
-        ]
+                **alert_filters,
+            })
+        return preferences
 
     def _alert_filters(self, filters: dict) -> dict:
-        collection_names = filters.get("nfts") or default_collection_names()
+        collection_names = filters.get("nfts") or []
         min_price = self._price_float(filters.get("minPrice"))
         max_price = self._price_float(filters.get("maxPrice")) or get_settings().mrkt_research_max_price
         return {

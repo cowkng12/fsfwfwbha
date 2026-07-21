@@ -16,7 +16,11 @@ export function ResultGrid({ items, loading, error }: Props) {
   }
 
   if (!visible.length) {
-    return <div className="empty" aria-busy={loading} />;
+    return (
+      <div className="empty" aria-busy={loading}>
+        {!loading && 'Упс, здесь пока что ничего нет, чтобы это исправить выберите нужные вам подарки для поиска в разделе "Фильтры"'}
+      </div>
+    );
   }
 
   return (

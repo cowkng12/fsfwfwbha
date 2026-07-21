@@ -1119,7 +1119,7 @@ mark {
 
 .listing-tools {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 14px;
 }
@@ -1138,6 +1138,11 @@ mark {
   color: #f2f2f2;
   font-size: 14px;
   font-weight: 900;
+}
+
+.listing-tools button:only-child {
+  min-height: 50px;
+  font-size: 15px;
 }
 
 .listing-tools span {
@@ -1371,4 +1376,58 @@ mark {
   z-index: 2;
   padding-top: 2px;
   background: linear-gradient(180deg, #020711 82%, transparent);
+}
+
+.empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 24px 18px;
+  border-radius: 8px;
+  background: #050505;
+  border: 1px solid #202020;
+  color: #bdbdbd;
+  line-height: 1.35;
+}
+
+.budget-table-head {
+  grid-template-columns: minmax(96px, 1fr) 78px 82px 38px;
+  gap: 8px;
+  padding: 0 6px;
+}
+
+.budget-gift-item {
+  grid-template-columns: 44px minmax(0, 1fr) 78px 82px 38px;
+  gap: 8px;
+  padding: 7px 6px;
+}
+
+.budget-gift-item .floor {
+  min-width: 0;
+  font-size: 13px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-table-head .sort-button {
+  text-align: right;
+}
+
+@media (max-width: 380px) {
+  .budget-table-head {
+    grid-template-columns: minmax(88px, 1fr) 70px 72px 34px;
+    gap: 6px;
+    padding-inline: 4px;
+  }
+
+  .budget-gift-item {
+    grid-template-columns: 40px minmax(0, 1fr) 70px 72px 34px;
+    gap: 6px;
+    padding-inline: 4px;
+  }
+
+  .budget-gift-item .floor {
+    font-size: 12px;
+  }
 }
