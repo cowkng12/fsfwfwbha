@@ -238,13 +238,50 @@ def collection_floor_ton(item: dict) -> float | None:
 
 
 def collection_volume_ton(item: dict) -> float | None:
+    nano_value = first_present(
+        item,
+        "volumeNanoTons",
+        "volumeNanoTONs",
+        "turnoverNanoTons",
+        "turnoverNanoTONs",
+        "totalVolumeNanoTons",
+        "totalVolumeNanoTONs",
+        "salesVolumeNanoTons",
+        "salesVolumeNanoTONs",
+    )
+    if nano_value not in (None, ""):
+        return nano_ton(nano_value)
     try:
-        value = item.get("volume")
+        value = first_present(
+            item,
+            "volume",
+            "turnover",
+            "totalVolume",
+            "salesVolume",
+            "volumeTon",
+            "volumeTON",
+            "turnoverTon",
+            "turnoverTON",
+        )
         if value in (None, ""):
             return None
-        return round(float(value) / 1_000_000_000, 2)
+        numeric = float(value)
+        return round(numeric / 1_000_000_000, 2) if numeric > 1_000_000 else round(numeric, 2)
     except (TypeError, ValueError):
         return None
+
+
+def first_present(item: dict, *keys: str):
+    for key in keys:
+        value = item.get(key)
+        if value not in (None, ""):
+            return value
+    lowered = {str(key).lower(): value for key, value in item.items()}
+    for key in keys:
+        value = lowered.get(key.lower())
+        if value not in (None, ""):
+            return value
+    return None
 
 
 def normalize_model(item: dict) -> dict:
