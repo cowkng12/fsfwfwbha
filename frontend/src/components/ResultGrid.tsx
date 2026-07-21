@@ -1,14 +1,14 @@
 import type { CSSProperties, MouseEvent } from 'react';
 import type { Listing } from '../types';
 
-type Props = { items: Listing[]; loading: boolean; error?: string | null };
+type Props = { items: Listing[]; loading: boolean; error?: string | null; subscriptionActive?: boolean };
 type CoverStyle = CSSProperties & { '--cover-bg': string };
 type TelegramWebApp = {
   openTelegramLink?: (url: string) => void;
   openLink?: (url: string) => void;
 };
 
-export function ResultGrid({ items, loading, error }: Props) {
+export function ResultGrid({ items, loading, error, subscriptionActive = true }: Props) {
   const visible = items.filter((item) => item.image_url && item.price > 0);
 
   if (error) {
@@ -18,7 +18,11 @@ export function ResultGrid({ items, loading, error }: Props) {
   if (!visible.length) {
     return (
       <div className="empty" aria-busy={loading}>
-        {!loading && 'Упс, здесь пока что ничего нет, чтобы это исправить выберите нужные вам подарки для поиска в разделе "Фильтры"'}
+        {!loading && (
+          subscriptionActive
+            ? 'Упс, здесь пока что ничего нет, чтобы это исправить выберите нужные вам подарки для поиска в разделе "Фильтры"'
+            : 'Чтобы начать ресерч и получить листинги приобрети подписку в разделе "Профиль"'
+        )}
       </div>
     );
   }

@@ -186,7 +186,7 @@ export function App() {
             <button className="clear-button" onClick={clearFeed}>Очистить</button>
           </div>
 
-          <ResultGrid items={visibleItems} loading={loading} error={loadError} />
+          <ResultGrid items={visibleItems} loading={loading} error={loadError} subscriptionActive={Boolean(subscription?.active)} />
         </>
       ) : (
         <ProfilePage status={subscription} user={telegramUser} />
