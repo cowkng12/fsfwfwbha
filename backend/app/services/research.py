@@ -168,11 +168,14 @@ class GiftTableParser(HTMLParser):
         self.rows: dict[str, str] = {}
         self.links: dict[str, str] = {}
         self.text_parts: list[str] = []
+        self.text_links: list[tuple[str, str]] = []
         self._row: list[str] = []
         self._row_links: list[str] = []
         self._capture: str | None = None
         self._text: list[str] = []
         self._link: str | None = None
+        self._anchor_href: str | None = None
+        self._anchor_text: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "tr":
@@ -182,19 +185,30 @@ class GiftTableParser(HTMLParser):
             self._capture = tag
             self._text = []
             self._link = None
-        if tag == "a" and self._capture == "td":
+        if tag == "a":
             href = dict(attrs).get("href")
             if href:
-                self._link = href
+                if self._capture == "td":
+                    self._link = href
+                self._anchor_href = href
+                self._anchor_text = []
 
     def handle_data(self, data: str) -> None:
         text = " ".join(data.split())
         if text:
             self.text_parts.append(text)
+            if self._anchor_href:
+                self._anchor_text.append(text)
         if self._capture:
             self._text.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._anchor_href:
+            text = " ".join(" ".join(self._anchor_text).split())
+            if text:
+                self.text_links.append((text, self._anchor_href))
+            self._anchor_href = None
+            self._anchor_text = []
         if tag in {"th", "td"} and self._capture == tag:
             value = " ".join("".join(self._text).split())
             self._row.append(value)
@@ -1151,7 +1165,7 @@ class ResearchService:
             return
         parser = GiftTableParser()
         parser.feed(response.text)
-        details = self._public_gift_details(parser.text)
+        details = self._public_gift_details(parser.text, parser.text_links)
         owner = parser.rows.get("owner") or details.get("owner")
         owner = self._telegram_username(parser.links.get("owner")) or owner
         if owner:
@@ -1235,18 +1249,21 @@ class ResearchService:
         match = re.search(r"(?:https?://)?(?:t\.me|telegram\.me)/([A-Za-z0-9_]{5,32})(?:[/?#].*)?$", url)
         return f"@{match.group(1)}" if match else None
 
-    def _public_gift_details(self, text: str) -> dict[str, str]:
+    def _public_gift_details(self, text: str, links: list[tuple[str, str]] | None = None) -> dict[str, str]:
         details: dict[str, str] = {}
         normalized = " ".join(text.split())
         if not normalized:
             return details
+        link_lookup = self._public_link_lookup(links or [])
         gifted_match = re.search(
             r"Gifted by\s+(.+?)\s+to\s+(.+?)\s+on\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
             normalized,
         )
         if gifted_match:
-            details["sender"] = self._public_person(gifted_match.group(1))
-            details["recipient"] = self._public_person(gifted_match.group(2))
+            sender = self._public_person(gifted_match.group(1))
+            recipient = self._public_person(gifted_match.group(2))
+            details["sender"] = link_lookup.get(sender.lower(), sender)
+            details["recipient"] = link_lookup.get(recipient.lower(), recipient)
             gifted_at = self._public_date(gifted_match.group(3))
             if gifted_at:
                 details["gifted_at"] = gifted_at
@@ -1255,14 +1272,26 @@ class ResearchService:
             normalized,
         )
         if owner_match:
-            details["owner"] = self._public_person(owner_match.group(1))
+            owner = self._public_person(owner_match.group(1))
+            details["owner"] = link_lookup.get(owner.lower(), owner)
         return {key: value for key, value in details.items() if value}
+
+    def _public_link_lookup(self, links: list[tuple[str, str]]) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        for text, href in links:
+            username = self._telegram_username(href)
+            if not username:
+                continue
+            key = self._public_person(text).lower()
+            if key:
+                lookup[key] = username
+        return lookup
 
     def _public_person(self, value: str) -> str:
         text = " ".join(value.split()).strip(" .,:;")
         if not text:
             return ""
-        username = re.search(r"@?([A-Za-z0-9_]{5,32})$", text)
+        username = re.search(r"@?([A-Za-z0-9_]{3,32})$", text)
         if username and text.lower() == username.group(1).lower():
             return f"@{username.group(1)}"
         return text

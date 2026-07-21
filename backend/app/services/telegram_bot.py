@@ -1,6 +1,7 @@
 import httpx
 import json
 import logging
+import re
 from io import BytesIO
 from datetime import datetime, timezone
 from html import escape
@@ -571,11 +572,11 @@ class TelegramBotService:
     def _format_owners(self, listing: Listing) -> str:
         parts: list[str] = []
         if listing.current_owner:
-            parts.append(f"Текущий владелец: {listing.current_owner}")
+            parts.append(f"Текущий владелец: {self._format_user_ref(listing.current_owner)}")
         if listing.original_sender:
-            parts.append(f"Первый отправитель: {listing.original_sender}")
+            parts.append(f"Первый отправитель: {self._format_user_ref(listing.original_sender)}")
         if listing.original_recipient:
-            parts.append(f"Первый получатель: {listing.original_recipient}")
+            parts.append(f"Первый получатель: {self._format_user_ref(listing.original_recipient)}")
         return "\n".join(parts) if parts else "Владельцы не найдены"
 
     def _format_activity(self, listing: Listing) -> str:
@@ -626,9 +627,19 @@ class TelegramBotService:
         return text if "." in text else f"{text}.0"
 
     def _format_listing_activity(self, listing: Listing) -> str:
-        owner = listing.current_owner or "владелец неизвестен"
+        owner = self._format_user_ref(listing.current_owner) if listing.current_owner else "владелец неизвестен"
         date = listing.last_sale_at or listing.first_seen_at or listing.updated_at
         return f"1. {owner}: {self._format_ton(listing.price)} TON, {self._format_days_ago(date)}"
+
+    def _format_user_ref(self, value: str) -> str:
+        text = " ".join(value.split()).strip()
+        if not text:
+            return value
+        if text.startswith("@"):
+            return text
+        if re.fullmatch(r"[A-Za-z0-9_]{3,32}", text):
+            return f"@{text}"
+        return text
 
     def _format_subscription_chunks(self, subscriptions: list[dict]) -> list[str]:
         lines = [f"<b>Активные подписки: {len(subscriptions)}</b>"]
