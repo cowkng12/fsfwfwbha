@@ -11,7 +11,71 @@ body { margin: 0; min-height: 100vh; background: #02050a; }
 button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
 
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.falling-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.falling-star {
+  position: absolute;
+  display: block;
+  color: rgba(255, 255, 255, 0.92);
+  opacity: var(--star-opacity, 0.6);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.45);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.2));
+  animation-name: star-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  transform: translate3d(0, -12vh, 0);
+  will-change: transform, opacity;
+}
+
+.falling-star:nth-child(3n) {
+  opacity: 0.45;
+}
+
+.falling-star:nth-child(4n) {
+  animation-name: star-fall, star-glow;
+  animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+}
+
+@keyframes star-fall {
+  0% {
+    transform: translate3d(0, -14vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--star-opacity, 0.6);
+  }
+  100% {
+    transform: translate3d(var(--drift, 0px), 120vh, 0) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@keyframes star-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.12));
+  }
+  50% {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+  }
+}
+
 .app-shell { max-width: 520px; min-height: 100vh; margin: 0 auto; padding: 18px 18px 104px; background: radial-gradient(circle at 50% -120px, #0d47a1 0, #02050a 42%, #02050a 100%); }
+.app-shell > :not(.falling-stars) {
+  position: relative;
+  z-index: 1;
+}
 .access-shell { display: grid; place-items: center; padding-bottom: 18px; }
 .access-message { width: 100%; padding: 22px 18px; border-radius: 14px; background: #2b2c2b; border: 1px solid #484a48; color: #fff; font-size: 18px; font-weight: 850; line-height: 1.3; text-align: center; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }

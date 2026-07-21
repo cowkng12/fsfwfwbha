@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   ACCESS_DENIED_MESSAGE,
   clearListings,
@@ -46,6 +47,21 @@ const SUBSCRIPTION_OPTIONS: SubscriptionOption[] = [
   { id: 'month', title: 'На месяц', messageLine: 'На месяц', price: '4000р / 50$', caption: 'Оптимально для работы' },
   { id: 'forever', title: 'Навсегда', messageLine: 'Навсегда', price: '10000р / 150$', caption: 'Один раз и без продлений' },
 ];
+
+const FALLING_STARS = [
+  { left: '4%', delay: '0s', duration: '18s', size: 8, opacity: 0.75, drift: -12, top: '-10%' },
+  { left: '13%', delay: '-5s', duration: '21s', size: 6, opacity: 0.5, drift: 8, top: '-18%' },
+  { left: '23%', delay: '-9s', duration: '24s', size: 7, opacity: 0.65, drift: -10, top: '-14%' },
+  { left: '34%', delay: '-2s', duration: '20s', size: 5, opacity: 0.55, drift: 6, top: '-22%' },
+  { left: '44%', delay: '-11s', duration: '23s', size: 7, opacity: 0.7, drift: -8, top: '-8%' },
+  { left: '55%', delay: '-7s', duration: '19s', size: 6, opacity: 0.48, drift: 12, top: '-20%' },
+  { left: '63%', delay: '-13s', duration: '26s', size: 8, opacity: 0.62, drift: -6, top: '-15%' },
+  { left: '72%', delay: '-4s', duration: '22s', size: 5, opacity: 0.58, drift: 9, top: '-25%' },
+  { left: '81%', delay: '-15s', duration: '27s', size: 7, opacity: 0.68, drift: -11, top: '-12%' },
+  { left: '89%', delay: '-6s', duration: '20s', size: 6, opacity: 0.52, drift: 7, top: '-19%' },
+  { left: '94%', delay: '-12s', duration: '25s', size: 5, opacity: 0.45, drift: -5, top: '-16%' },
+  { left: '52%', delay: '-17s', duration: '28s', size: 9, opacity: 0.72, drift: 10, top: '-6%' },
+] as const;
 
 export function App() {
   const [items, setItems] = useState<Listing[]>([]);
@@ -168,6 +184,25 @@ export function App() {
 
   return (
     <main className="app-shell">
+      <div className="falling-stars" aria-hidden="true">
+        {FALLING_STARS.map((star, index) => (
+          <span
+            key={`${star.left}-${index}`}
+            className="falling-star"
+            style={{
+              left: star.left,
+              top: star.top,
+              animationDelay: star.delay,
+              animationDuration: star.duration,
+              fontSize: `${star.size}px`,
+              '--drift': `${star.drift}px`,
+              '--star-opacity': star.opacity,
+            } as CSSProperties}
+          >
+            ✦
+          </span>
+        ))}
+      </div>
       {activePage === 'listing' ? (
         <>
           <section className="profile-card listing-panel">
