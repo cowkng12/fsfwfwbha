@@ -19,9 +19,10 @@ button { border: 0; cursor: pointer; }
 .falling-stars {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 62;
   pointer-events: none;
   overflow: hidden;
+  mix-blend-mode: screen;
 }
 
 .falling-star {
@@ -1228,11 +1229,10 @@ mark {
 }
 
 .profile-page {
-  min-height: calc(100vh - 138px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 28px 14px 18px;
+  justify-content: flex-start;
+  padding: 20px 14px 18px;
 }
 
 .profile-page .profile-hero {
@@ -1309,7 +1309,7 @@ mark {
 
 /* Final layout overrides */
 .app-shell {
-  padding-bottom: 88px;
+  padding-bottom: 76px;
 }
 
 .bottom-nav {
@@ -1443,10 +1443,10 @@ mark {
 }
 
 .empty {
-  min-height: 180px;
+  min-height: 108px;
   display: grid;
   place-items: center;
-  padding: 24px 18px;
+  padding: 18px 16px;
   border-radius: 8px;
   background: #050505;
   border: 1px solid #202020;

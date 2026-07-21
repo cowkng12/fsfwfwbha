@@ -769,6 +769,69 @@ class SubscriptionRepository:
             recipients.add(str(settings.telegram_alert_chat_id))
         return sorted(recipients)
 
+    def active_subscriptions(self) -> list[dict]:
+        settings = get_settings()
+        now = datetime.now(timezone.utc)
+        rows: list[dict] = []
+        seen: set[str] = set()
+
+        for user_id in sorted(settings.telegram_allowed_user_id_set | settings.telegram_allowed_chat_id_set):
+            key = str(user_id)
+            rows.append(
+                {
+                    "user_id": key,
+                    "plan_id": "owner",
+                    "status": "owner",
+                    "started_at": None,
+                    "expires_at": None,
+                    "updated_at": None,
+                }
+            )
+            seen.add(key)
+
+        for user_id in sorted(settings.telegram_granted_user_id_set):
+            key = str(user_id)
+            if key in seen:
+                continue
+            rows.append(
+                {
+                    "user_id": key,
+                    "plan_id": "env_grant",
+                    "status": "env_grant",
+                    "started_at": None,
+                    "expires_at": None,
+                    "updated_at": None,
+                }
+            )
+            seen.add(key)
+
+        store = SupabaseStore()
+        if store.enabled:
+            source_rows = store.select("subscriptions", {"select": "*"})  # type: ignore[arg-type]
+        else:
+            with connect() as conn:
+                source_rows = conn.execute("SELECT * FROM subscriptions").fetchall()
+                source_rows = [dict(row) for row in source_rows]
+
+        for row in source_rows:
+            data = dict(row)
+            user_id = str(data.get("user_id") or "")
+            if not user_id or user_id in seen:
+                continue
+            status = str(data.get("status") or "inactive")
+            expires_at = data.get("expires_at")
+            parsed_expires_at = self._parse_datetime(expires_at)
+            active = status == "active" and (not expires_at or (parsed_expires_at is not None and parsed_expires_at > now))
+            if not active:
+                continue
+            data["user_id"] = user_id
+            data["active"] = True
+            rows.append(data)
+            seen.add(user_id)
+
+        rows.sort(key=self._subscription_sort_key)
+        return rows
+
     def activate(
         self,
         user_id: int | str,
@@ -979,3 +1042,24 @@ class SubscriptionRepository:
             return row[key]  # type: ignore[index]
         except (KeyError, TypeError, IndexError):
             return None
+
+    def _parse_datetime(self, value: object | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _subscription_sort_key(self, row: dict) -> tuple[int, datetime, int]:
+        status = str(row.get("status") or "")
+        priority = 0 if status in {"owner", "env_grant"} else 1
+        expires_at = self._parse_datetime(row.get("expires_at")) or datetime.max.replace(tzinfo=timezone.utc)
+        try:
+            user_id = int(str(row.get("user_id") or 0))
+        except ValueError:
+            user_id = 0
+        return (priority, expires_at, user_id)

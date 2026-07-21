@@ -37,6 +37,7 @@ class TelegramBotService:
             await self._post("setMyCommands", {"commands": [
                 {"command": "start", "description": "Открыть Mini App"},
                 {"command": "subscribe", "description": "Купить подписку"},
+                {"command": "subs", "description": "Активные подписки"},
                 {"command": "testalert", "description": "Проверить alert-чат"},
             ]})
             await self._post("setChatMenuButton", {"menu_button": {"type": "web_app", "text": "Mini App", "web_app": {"url": self.settings.public_base_url.rstrip("/")}}})
@@ -78,6 +79,9 @@ class TelegramBotService:
             return
         if text.startswith("/revoke"):
             await self.handle_revoke_command(chat_id, user_id, text)
+            return
+        if text.startswith("/subs") or text.startswith("/subscriptions"):
+            await self.handle_subscriptions_command(chat_id, user_id)
             return
         if text.startswith("/testalert"):
             await self.handle_test_alert_command(chat_id, user_id)
@@ -229,6 +233,24 @@ class TelegramBotService:
             await self._post("sendMessage", {"chat_id": chat_id, "text": f"Тест не прошёл: {exc}"})
             return
         await self._post("sendMessage", {"chat_id": chat_id, "text": "Тестовое сообщение отправлено в alert-чат."})
+
+    async def handle_subscriptions_command(self, chat_id: int, admin_user_id: int | None) -> None:
+        if not self._is_admin(chat_id, admin_user_id):
+            await self.send_admin_denied(chat_id)
+            return
+        subscriptions = SubscriptionRepository().active_subscriptions()
+        if not subscriptions:
+            await self._post("sendMessage", {"chat_id": chat_id, "text": "Активных подписок пока нет."})
+            return
+        for chunk in self._format_subscription_chunks(subscriptions):
+            await self._post(
+                "sendMessage",
+                {
+                    "chat_id": chat_id,
+                    "text": chunk,
+                    "parse_mode": "HTML",
+                },
+            )
 
     def _is_allowed(self, chat_id: int, user_id: int | None) -> bool:
         allowed_chats = self.settings.telegram_allowed_chat_id_set
@@ -599,6 +621,43 @@ class TelegramBotService:
         owner = listing.current_owner or "владелец неизвестен"
         date = listing.last_sale_at or listing.first_seen_at or listing.updated_at
         return f"1. {owner}: {self._format_ton(listing.price)} TON, {self._format_days_ago(date)}"
+
+    def _format_subscription_chunks(self, subscriptions: list[dict]) -> list[str]:
+        lines = [f"<b>Активные подписки: {len(subscriptions)}</b>"]
+        for index, row in enumerate(subscriptions, start=1):
+            user_id = escape(str(row.get("user_id") or "-"))
+            status = str(row.get("status") or "")
+            plan_id = str(row.get("plan_id") or "")
+            expires_at = row.get("expires_at")
+            if status in {"owner", "env_grant"} or not expires_at:
+                expires_text = "навсегда"
+            else:
+                expires_text = self._format_date(str(expires_at))
+            label = self._subscription_label(plan_id, status)
+            lines.append(f"{index}. <code>{user_id}</code> · {escape(label)} · {escape(expires_text)}")
+
+        chunks: list[str] = []
+        current = ""
+        for line in lines:
+            candidate = f"{current}\n{line}" if current else line
+            if len(candidate) > 3800 and current:
+                chunks.append(current)
+                current = line
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
+        return chunks
+
+    def _subscription_label(self, plan_id: str, status: str) -> str:
+        if status == "owner":
+            return "владелец"
+        if status == "env_grant":
+            return "env grant"
+        plan = SubscriptionRepository().plan(plan_id)
+        if plan:
+            return str(plan.get("title") or plan_id)
+        return plan_id or status or "подписка"
 
     def _format_date(self, value: str) -> str:
         parsed = self._parse_datetime(value)
