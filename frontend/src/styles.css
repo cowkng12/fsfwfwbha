@@ -1540,3 +1540,77 @@ mark {
     font-size: 12px;
   }
 }
+
+/* Current mobile layout fixes */
+.app-shell {
+  min-height: 100svh;
+  padding-bottom: 0;
+}
+
+.bottom-nav {
+  bottom: 0;
+  width: min(100%, 520px);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+}
+
+.budget-sheet {
+  align-items: flex-end;
+  padding: 0 12px max(10px, env(safe-area-inset-bottom));
+}
+
+.budget-panel {
+  max-height: min(74svh, 640px);
+  padding: 18px 14px 14px;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -18px 60px #000e, inset 0 1px 0 #ffffff08;
+}
+
+.budget-panel > .sheet-close {
+  position: absolute;
+  top: -54px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.budget-panel h2 {
+  margin-bottom: 16px;
+}
+
+.budget-actions {
+  padding-bottom: 0;
+}
+
+.subscription-sheet {
+  z-index: 90;
+}
+
+.subscription-panel {
+  max-height: min(78svh, 660px);
+  padding-bottom: 18px;
+}
+
+.subscription-menu > .sheet-close {
+  z-index: 95;
+}
+
+.profile-page {
+  padding: 8px 14px 0;
+}
+
+.profile-page .profile-hero {
+  padding: 4px 0 14px;
+}
+
+.profile-page .profile-avatar {
+  width: 116px;
+  height: 116px;
+}
+
+.profile-page .profile-divider {
+  margin: 4px 0 18px;
+}
+
+.profile-page .contact-button {
+  margin-top: 14px;
+}

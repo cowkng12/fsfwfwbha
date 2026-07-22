@@ -61,7 +61,7 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
         <button className="sheet-close" onClick={onClose} aria-label="Закрыть">×</button>
         {!giftPickerOpen ? (
           <>
-            <h2>Фильтры</h2>
+            <h2>Бюджет</h2>
             <div className="budget-range">
               <label>
                 <span>От</span>

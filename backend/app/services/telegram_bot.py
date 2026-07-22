@@ -613,8 +613,9 @@ class TelegramBotService:
             price = self._format_sale_ton(listing.last_sale_price)
             number = listing.number or "-"
             return f"#{number} за {price} TON - {self._format_days_ago(listing.last_sale_at)}"
-        if listing.sales_count:
-            return f"Продаж у подарка: {self._format_int(listing.sales_count)}"
+        if listing.number and listing.price:
+            date = listing.last_sale_at or listing.first_seen_at or listing.updated_at
+            return f"#{listing.number} за {self._format_sale_ton(listing.price)} TON на MRKT - {self._format_days_ago(date)}"
         return "Нет свежих продаж модели"
 
     def _format_sale_ton(self, value: float | int | str | None) -> str:
