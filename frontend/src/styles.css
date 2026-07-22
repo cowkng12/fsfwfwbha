@@ -1926,22 +1926,22 @@ mark {
   inset: 0;
   z-index: 120;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
-  padding: 0 18px max(34px, env(safe-area-inset-bottom));
+  padding: 76px 18px max(26px, env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.62);
 }
 
 .budget-panel {
   width: min(100%, 520px);
-  max-height: min(54dvh, 500px);
+  max-height: min(48dvh, 460px);
   margin: 0;
   padding: 58px 20px 20px;
   overflow-y: auto;
-  transform: none;
+  transform: translateY(64px);
   border: 1px solid #2b2b2b;
   border-radius: 24px;
   background: #050505;
@@ -1949,8 +1949,9 @@ mark {
 }
 
 .budget-panel.gift-picker-mode {
-  max-height: min(70dvh, 640px);
+  max-height: min(64dvh, 600px);
   padding-top: 18px;
+  transform: translateY(36px);
 }
 
 .budget-panel > .sheet-close {
@@ -1982,11 +1983,12 @@ mark {
 
 @media (max-width: 380px) {
   .budget-sheet {
-    padding: 0 12px max(26px, env(safe-area-inset-bottom));
+    padding: 72px 12px max(22px, env(safe-area-inset-bottom));
   }
 
   .budget-panel {
-    max-height: min(56dvh, 480px);
+    max-height: min(50dvh, 440px);
     padding: 54px 14px 16px;
+    transform: translateY(48px);
   }
 }
