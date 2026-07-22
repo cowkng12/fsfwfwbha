@@ -1092,6 +1092,8 @@ class ResearchService:
             "sale_date",
             "soldAt",
             "sold_at",
+            "receivedDate",
+            "received_at",
             "updatedAt",
             "updated_at",
             "listedAt",

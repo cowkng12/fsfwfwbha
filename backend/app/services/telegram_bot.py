@@ -616,7 +616,9 @@ class TelegramBotService:
             number = listing.number or "-"
             return f"#{number} за {price} TON - {self._format_days_ago(listing.last_sale_at)}"
         if listing.number and listing.price:
-            return f"#{listing.number} за {self._format_sale_ton(listing.price)} TON на MRKT"
+            date = listing.last_sale_at or listing.received_at
+            suffix = f" - {self._format_days_ago(date)}" if date else ""
+            return f"#{listing.number} за {self._format_sale_ton(listing.price)} TON на MRKT{suffix}"
         return "Нет свежих продаж модели"
 
     def _format_sale_ton(self, value: float | int | str | None) -> str:
