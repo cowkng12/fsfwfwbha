@@ -221,6 +221,9 @@ export function App() {
                 <span><UiIcon name="sliders" /></span>
                 <b>Бюджет</b>
               </button>
+              {budgetOpen && catalog && (
+                <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
+              )}
             </div>
             <label className="top-search">
               <span><UiIcon name="search" /></span>
@@ -258,10 +261,6 @@ export function App() {
           <b>Профиль</b>
         </button>
       </nav>
-
-      {budgetOpen && catalog && (
-        <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
-      )}
 
     </main>
   );
