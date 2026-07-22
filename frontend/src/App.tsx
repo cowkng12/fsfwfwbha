@@ -73,6 +73,7 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [subscriptionMenuOpen, setSubscriptionMenuOpen] = useState(false);
   const [activePage, setActivePage] = useState<AppPage>('listing');
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const telegramUser = getTelegramUser();
@@ -239,10 +240,10 @@ export function App() {
           <ResultGrid items={visibleItems} loading={loading} error={loadError} subscriptionActive={Boolean(subscription?.active)} />
         </>
       ) : (
-        <ProfilePage status={subscription} user={telegramUser} />
+        <ProfilePage status={subscription} user={telegramUser} onPlansOpenChange={setSubscriptionMenuOpen} />
       )}
 
-      <nav className={budgetOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
+      <nav className={budgetOpen || subscriptionMenuOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
         <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setActivePage('listing');
@@ -361,14 +362,22 @@ function hasSavedSearchIntent(filters: FilterState) {
 function ProfilePage({
   status,
   user,
+  onPlansOpenChange,
 }: {
   status: SubscriptionStatus | null;
   user: TelegramUser | null;
+  onPlansOpenChange: (open: boolean) => void;
 }) {
   const [plansOpen, setPlansOpen] = useState(false);
   const currentPlan = status?.plans.find((plan) => plan.id === status.plan_id);
   const daysLeft = subscriptionDaysLeft(status);
   const action = status?.active ? 'renew' : 'buy';
+
+  useEffect(() => {
+    onPlansOpenChange(plansOpen);
+    return () => onPlansOpenChange(false);
+  }, [plansOpen, onPlansOpenChange]);
+
   return (
     <section className="profile-page" aria-label="Профиль">
       <div className="profile-hero">
