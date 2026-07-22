@@ -112,7 +112,14 @@ if frontend_dist.exists():
 def frontend(full_path: str):
     index = frontend_dist / "index.html"
     if index.exists():
-        return FileResponse(index)
+        return FileResponse(
+            index,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return {"ok": True, "message": "Frontend build is not available. Run npm run build."}
 
 
