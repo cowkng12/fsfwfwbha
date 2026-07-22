@@ -223,6 +223,9 @@ export function App() {
                 <b>Бюджет</b>
               </button>
             </div>
+            {budgetOpen && catalog && (
+              <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} inline />
+            )}
             <label className="top-search">
               <span><UiIcon name="search" /></span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
@@ -243,7 +246,7 @@ export function App() {
         <ProfilePage status={subscription} user={telegramUser} onPlansOpenChange={setSubscriptionMenuOpen} />
       )}
 
-      <nav className={budgetOpen || subscriptionMenuOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
+      <nav className={subscriptionMenuOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
         <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setActivePage('listing');
@@ -259,10 +262,6 @@ export function App() {
           <b>Профиль</b>
         </button>
       </nav>
-
-      {budgetOpen && catalog && (
-        <BudgetSheet catalog={catalog} filters={filters} onClose={() => setBudgetOpen(false)} onApply={applyBudget} />
-      )}
 
     </main>
   );

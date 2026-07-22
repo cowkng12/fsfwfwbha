@@ -6,12 +6,13 @@ type Props = {
   filters: FilterState;
   onClose: () => void;
   onApply: (filters: FilterState) => void;
+  inline?: boolean;
 };
 
 type SortKey = 'name' | 'floor' | 'turnover';
 type SortState = { key: SortKey; direction: 'asc' | 'desc' };
 
-export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
+export function BudgetSheet({ catalog, filters, onClose, onApply, inline = false }: Props) {
   const [draft, setDraft] = useState<FilterState>(filters);
   const [giftPickerOpen, setGiftPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -56,7 +57,13 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
   };
 
   return (
-    <div className="budget-sheet" role="dialog" aria-modal="true" aria-label="Бюджет" onClick={onClose}>
+    <div
+      className={inline ? 'budget-sheet inline-budget-menu' : 'budget-sheet'}
+      role="dialog"
+      aria-modal={!inline}
+      aria-label="Бюджет"
+      onClick={inline ? undefined : onClose}
+    >
       <section className={giftPickerOpen ? 'budget-panel gift-picker-mode' : 'budget-panel'} onClick={(event) => event.stopPropagation()}>
         <button className="sheet-close" onClick={onClose} aria-label="Закрыть">×</button>
         {!giftPickerOpen ? (
