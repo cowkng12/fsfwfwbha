@@ -1003,9 +1003,11 @@ class ResearchService:
                     value_info = None
                 date = self._iso_datetime(getattr(value_info, "last_sale_date", None)) if value_info else date
             price = self._price(gift, "salePrice", "salePriceWithoutFee", "priceNano", "price", "tonPrice")
-            if price is None or not date:
+            if price is None:
                 continue
-            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date})
+            estimated_date = not date
+            date = date or datetime.now(timezone.utc).isoformat()
+            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date, "estimated_date": estimated_date})
 
         sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         self._model_sales_cache[key] = sales[:MODEL_RECENT_SALES_LIMIT]
@@ -1059,9 +1061,9 @@ class ResearchService:
             except Exception:
                 value_info = None
             date = self._iso_datetime(getattr(value_info, "last_sale_date", None)) if value_info else None
-            if not date:
-                continue
-            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date})
+            estimated_date = not date
+            date = date or datetime.now(timezone.utc).isoformat()
+            sales.append({"number": number, "price": price, "platform": "MRKT", "date": date, "estimated_date": estimated_date})
         sales.sort(key=lambda item: self._parse_datetime(item["date"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return sales
 

@@ -606,7 +606,7 @@ class TelegramBotService:
             price = self._format_sale_ton(sale.get("price"))
             platform = sale.get("platform") or "MRKT"
             date = sale.get("date") or ""
-            age = self._format_days_ago(date) if date else ""
+            age = self._format_days_ago(date) if date and not sale.get("estimated_date") else ""
             suffix = f" - {age}" if age else ""
             parts.append(f"#{number} за {price} TON на {platform}{suffix}")
         if parts:
