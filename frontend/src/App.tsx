@@ -217,12 +217,6 @@ export function App() {
               <span>{budgetSummary(filters)}</span>
               <small>{activeFilterCount ? `${activeFilterCount} фильтра` : 'Все подарки'}</small>
             </div>
-            <div className="listing-tools" aria-label="Настройки листинга">
-              <button onClick={() => setBudgetOpen(true)}>
-                <span><UiIcon name="sliders" /></span>
-                <b>Бюджет</b>
-              </button>
-            </div>
             <label className="top-search">
               <span><UiIcon name="search" /></span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск" />
@@ -243,13 +237,20 @@ export function App() {
         <ProfilePage status={subscription} user={telegramUser} onPlansOpenChange={setSubscriptionMenuOpen} />
       )}
 
-      <nav className={budgetOpen || subscriptionMenuOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
-        <button aria-label="Листинги" className={activePage === 'listing' ? 'nav-button active' : 'nav-button'} onClick={() => {
+      <nav className={subscriptionMenuOpen ? 'bottom-nav is-covered' : 'bottom-nav'} aria-label="Навигация">
+        <button aria-label="Листинги" className={activePage === 'listing' && !budgetOpen ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
           setActivePage('listing');
         }}>
           <span><UiIcon name="grid" /></span>
           <b>Листинги</b>
+        </button>
+        <button aria-label="Бюджет" className={budgetOpen ? 'nav-button active' : 'nav-button'} onClick={() => {
+          setActivePage('listing');
+          setBudgetOpen(true);
+        }}>
+          <span><UiIcon name="sliders" /></span>
+          <b>Бюджет</b>
         </button>
         <button aria-label="Профиль" className={activePage === 'profile' ? 'nav-button active' : 'nav-button'} onClick={() => {
           setBudgetOpen(false);
