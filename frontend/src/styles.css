@@ -1614,3 +1614,72 @@ mark {
 .profile-page .contact-button {
   margin-top: 14px;
 }
+
+/* Tight bottom anchoring */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px 0;
+}
+
+.app-shell > :not(.falling-stars):not(.bottom-nav):not(.budget-sheet) {
+  flex-shrink: 0;
+}
+
+.bottom-nav {
+  position: sticky;
+  left: auto;
+  bottom: 0;
+  z-index: 60;
+  width: calc(100% + 16px);
+  max-width: none;
+  margin: auto -8px 0;
+  transform: none;
+  border-radius: 8px 8px 0 0;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+}
+
+.bottom-nav.is-covered {
+  transform: translateY(calc(100% + 14px));
+}
+
+.profile-page {
+  padding-top: 4px;
+}
+
+.profile-page .profile-hero {
+  padding-top: 0;
+}
+
+.budget-sheet {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px max(8px, env(safe-area-inset-bottom));
+}
+
+.budget-panel {
+  width: min(100%, 520px);
+  max-height: min(62dvh, 560px);
+  padding: 18px 14px 14px;
+  border-radius: 22px 22px 0 0;
+}
+
+.budget-panel.gift-picker-mode {
+  max-height: min(74dvh, 660px);
+}
+
+.budget-panel > .sheet-close {
+  position: absolute;
+  top: -52px;
+}
+
+.subscription-sheet {
+  z-index: 90;
+}
+
+.subscription-panel {
+  max-height: min(76dvh, 660px);
+  padding-bottom: 18px;
+}

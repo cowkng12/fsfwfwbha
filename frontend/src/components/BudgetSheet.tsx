@@ -56,7 +56,7 @@ export function BudgetSheet({ catalog, filters, onClose, onApply }: Props) {
   };
 
   return (
-    <div className="budget-sheet" role="dialog" aria-modal="true" aria-label="Фильтры" onClick={onClose}>
+    <div className="budget-sheet" role="dialog" aria-modal="true" aria-label="Бюджет" onClick={onClose}>
       <section className={giftPickerOpen ? 'budget-panel gift-picker-mode' : 'budget-panel'} onClick={(event) => event.stopPropagation()}>
         <button className="sheet-close" onClick={onClose} aria-label="Закрыть">×</button>
         {!giftPickerOpen ? (

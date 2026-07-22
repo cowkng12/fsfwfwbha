@@ -219,7 +219,7 @@ export function App() {
             <div className="listing-tools" aria-label="Настройки листинга">
               <button onClick={() => setBudgetOpen(true)}>
                 <span><UiIcon name="sliders" /></span>
-                <b>Фильтры</b>
+                <b>Бюджет</b>
               </button>
             </div>
             <label className="top-search">
