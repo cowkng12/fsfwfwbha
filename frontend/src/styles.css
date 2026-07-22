@@ -1937,11 +1937,11 @@ mark {
 
 .budget-panel {
   width: min(100%, 520px);
-  max-height: min(48dvh, 460px);
+  max-height: none;
   margin: 0;
-  padding: 58px 20px 20px;
-  overflow-y: auto;
-  transform: translateY(64px);
+  padding: 46px 20px 18px;
+  overflow: visible;
+  transform: translateY(42px);
   border: 1px solid #2b2b2b;
   border-radius: 24px;
   background: #050505;
@@ -1950,8 +1950,9 @@ mark {
 
 .budget-panel.gift-picker-mode {
   max-height: min(64dvh, 600px);
+  overflow-y: auto;
   padding-top: 18px;
-  transform: translateY(36px);
+  transform: translateY(22px);
 }
 
 .budget-panel > .sheet-close {
@@ -1968,9 +1969,37 @@ mark {
 
 .budget-panel:not(.gift-picker-mode) .budget-actions {
   position: static;
-  margin-top: 18px;
+  margin-top: 14px;
   padding: 0;
   background: none;
+}
+
+.budget-panel:not(.gift-picker-mode) h2 {
+  margin-bottom: 14px;
+  font-size: 29px;
+}
+
+.budget-panel:not(.gift-picker-mode) .budget-range {
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.budget-panel:not(.gift-picker-mode) .budget-range label {
+  gap: 6px;
+}
+
+.budget-panel:not(.gift-picker-mode) .budget-range input {
+  min-height: 50px;
+  font-size: 20px;
+}
+
+.budget-panel:not(.gift-picker-mode) .gift-scope-button {
+  min-height: 70px;
+  padding: 12px 14px;
+}
+
+.budget-panel:not(.gift-picker-mode) .budget-actions button {
+  height: 40px;
 }
 
 .budget-panel.gift-picker-mode .budget-actions {
@@ -1987,8 +2016,23 @@ mark {
   }
 
   .budget-panel {
-    max-height: min(50dvh, 440px);
-    padding: 54px 14px 16px;
-    transform: translateY(48px);
+    padding: 44px 14px 14px;
+    transform: translateY(34px);
+  }
+
+  .budget-panel:not(.gift-picker-mode) h2 {
+    font-size: 27px;
+  }
+
+  .budget-panel:not(.gift-picker-mode) .budget-range input {
+    min-height: 46px;
+  }
+
+  .budget-panel:not(.gift-picker-mode) .gift-scope-button {
+    min-height: 66px;
+  }
+
+  .budget-panel:not(.gift-picker-mode) .budget-actions button {
+    height: 38px;
   }
 }
