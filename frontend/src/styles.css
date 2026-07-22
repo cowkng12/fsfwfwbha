@@ -1857,3 +1857,65 @@ mark {
     font-size: 14px;
   }
 }
+
+/* Budget menu: opened from the card button, shown as a compact menu overlay. */
+.budget-sheet {
+  z-index: 120;
+  align-items: center;
+  justify-content: center;
+  padding: 116px 18px 24px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.budget-panel {
+  width: min(100%, 520px);
+  max-height: min(68dvh, 560px);
+  margin: 0;
+  padding: 56px 20px 20px;
+  overflow-y: auto;
+  transform: translateY(52px);
+  border: 1px solid #292929;
+  border-radius: 22px;
+  background: #050505;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.budget-panel.gift-picker-mode {
+  max-height: min(76dvh, 660px);
+  padding-top: 18px;
+  transform: translateY(32px);
+}
+
+.budget-panel > .sheet-close {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.budget-panel:not(.gift-picker-mode) .budget-actions {
+  position: static;
+  margin-top: 18px;
+  padding: 0;
+  background: none;
+}
+
+.budget-panel.gift-picker-mode .budget-actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding: 12px 0 0;
+  background: linear-gradient(180deg, transparent, #050505 30%);
+}
+
+@media (max-width: 380px) {
+  .budget-sheet {
+    padding: 96px 14px 20px;
+  }
+
+  .budget-panel {
+    max-height: min(68dvh, 520px);
+    padding: 52px 14px 16px;
+    transform: translateY(34px);
+  }
+}
