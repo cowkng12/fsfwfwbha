@@ -1935,7 +1935,7 @@ mark {
 
 .budget-panel {
   position: absolute;
-  top: clamp(120px, 18dvh, 220px);
+  top: clamp(70px, 12dvh, 150px);
   left: 50%;
   width: min(100%, 520px);
   max-width: calc(100vw - 36px);
@@ -2014,7 +2014,7 @@ mark {
 
 @media (max-width: 380px) {
   .budget-panel {
-    top: clamp(110px, 18dvh, 200px);
+    top: clamp(64px, 12dvh, 140px);
     max-width: calc(100vw - 24px);
     padding: 44px 14px 14px;
   }
