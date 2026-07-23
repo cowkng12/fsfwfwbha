@@ -1941,13 +1941,13 @@ mark {
   max-width: calc(100vw - 36px);
   max-height: none;
   margin: 0;
-  padding: 46px 20px 18px;
+  padding: 64px 22px 18px;
   overflow: visible;
   transform: translateX(-50%);
-  border: 1px solid #2b2b2b;
-  border-radius: 24px;
-  background: #050505;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid #2c2c2c;
+  border-radius: 24px 24px 8px 8px;
+  background: linear-gradient(180deg, #080808 0%, #050505 72%, #030303 100%);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .budget-panel.gift-picker-mode {
@@ -1959,31 +1959,34 @@ mark {
 
 .budget-panel > .sheet-close {
   position: absolute;
-  top: 14px;
-  right: 16px;
-  left: auto;
-  width: 40px;
-  height: 36px;
+  top: 20px;
+  right: auto;
+  left: 50%;
+  width: 66px;
+  height: 52px;
   margin: 0;
-  transform: none;
-  font-size: 24px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #333;
+  border-radius: 999px;
+  background: #101010;
+  font-size: 30px;
 }
 
 .budget-panel:not(.gift-picker-mode) .budget-actions {
   position: static;
-  margin-top: 14px;
+  margin-top: 16px;
   padding: 0;
   background: none;
 }
 
 .budget-panel:not(.gift-picker-mode) h2 {
-  margin-bottom: 14px;
-  font-size: 29px;
+  margin-bottom: 22px;
+  font-size: 31px;
 }
 
 .budget-panel:not(.gift-picker-mode) .budget-range {
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
 .budget-panel:not(.gift-picker-mode) .budget-range label {
@@ -1991,17 +1994,17 @@ mark {
 }
 
 .budget-panel:not(.gift-picker-mode) .budget-range input {
-  min-height: 50px;
-  font-size: 20px;
+  min-height: 58px;
+  font-size: 22px;
 }
 
 .budget-panel:not(.gift-picker-mode) .gift-scope-button {
-  min-height: 70px;
-  padding: 12px 14px;
+  min-height: 76px;
+  padding: 13px 14px;
 }
 
 .budget-panel:not(.gift-picker-mode) .budget-actions button {
-  height: 40px;
+  height: 48px;
 }
 
 .budget-panel.gift-picker-mode .budget-actions {
@@ -2016,7 +2019,7 @@ mark {
   .budget-panel {
     top: clamp(64px, 12dvh, 140px);
     max-width: calc(100vw - 24px);
-    padding: 44px 14px 14px;
+    padding: 58px 14px 14px;
   }
 
   .budget-panel:not(.gift-picker-mode) h2 {
