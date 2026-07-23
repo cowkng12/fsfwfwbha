@@ -55,11 +55,13 @@ class MrktClient:
         if not self.settings.telegram_api_id or not self.settings.telegram_api_hash or not self.settings.telegram_session:
             raise RuntimeError("MRKT auth requires TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION")
 
-        async with TelegramClient(
+        client = TelegramClient(
             StringSession(self.settings.telegram_session),
             self.settings.telegram_api_id,
             self.settings.telegram_api_hash,
-        ) as client:
+        )
+        await client.connect()
+        try:
             if not await client.is_user_authorized():
                 raise RuntimeError("Telegram session is not authorized")
             resolved = await client(ResolveUsernameRequest("mrkt"))
@@ -69,6 +71,8 @@ class MrktClient:
             app = InputBotAppShortName(bot_id=bot, short_name="app")
             web_view = await client(RequestAppWebViewRequest(peer=peer, app=app, platform="android"))
             init_data = unquote(web_view.url.split("tgWebAppData=", 1)[1].split("&tgWebAppVersion", 1)[0])
+        finally:
+            await client.disconnect()
         return init_data
 
     async def token(self) -> str:
