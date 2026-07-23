@@ -1924,24 +1924,26 @@ mark {
 .budget-sheet {
   position: fixed;
   inset: 0;
-  z-index: 55;
-  display: grid;
-  align-items: start;
-  justify-content: center;
+  z-index: 120;
+  display: block;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
-  padding: clamp(260px, 34dvh, 380px) 18px 0;
+  padding: 0;
   background: rgba(0, 0, 0, 0.62);
 }
 
 .budget-panel {
+  position: absolute;
+  top: clamp(420px, 47dvh, 600px);
+  left: 50%;
   width: min(100%, 520px);
+  max-width: calc(100vw - 36px);
   max-height: none;
   margin: 0;
   padding: 46px 20px 18px;
   overflow: visible;
-  transform: none;
+  transform: translateX(-50%);
   border: 1px solid #2b2b2b;
   border-radius: 24px;
   background: #050505;
@@ -1952,7 +1954,7 @@ mark {
   max-height: min(64dvh, 600px);
   overflow-y: auto;
   padding-top: 18px;
-  transform: none;
+  transform: translateX(-50%);
 }
 
 .budget-panel > .sheet-close {
@@ -2011,11 +2013,9 @@ mark {
 }
 
 @media (max-width: 380px) {
-  .budget-sheet {
-    padding: clamp(238px, 33dvh, 340px) 12px 0;
-  }
-
   .budget-panel {
+    top: clamp(382px, 46dvh, 540px);
+    max-width: calc(100vw - 24px);
     padding: 44px 14px 14px;
   }
 
