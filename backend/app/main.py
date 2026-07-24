@@ -39,11 +39,26 @@ async def run_research_cycle() -> dict[str, int | bool | str | None]:
         pruned_count = repo.prune_stale_listings(settings.listings_retention_hours)
         targets = SearchPreferencesRepository().active_targets()
         try:
-            stored = await research.run(
-                collection_names=targets["collection_names"],
-                min_price=targets["min_price"],
-                max_price=targets["max_price"],
+            stored = await asyncio.wait_for(
+                research.run(
+                    collection_names=targets["collection_names"],
+                    min_price=targets["min_price"],
+                    max_price=targets["max_price"],
+                ),
+                timeout=max(30, int(settings.mrkt_research_timeout_seconds)),
             )
+        except TimeoutError:
+            ResearchRunRepository().add("mrkt", "timeout", f"research exceeded {settings.mrkt_research_timeout_seconds}s")
+            logger.warning("MRKT research cycle timed out after %ss", settings.mrkt_research_timeout_seconds)
+            return {
+                "stored": 0,
+                "sent": 0,
+                "pruned": pruned_count,
+                "baseline": baseline_count,
+                "alerts_ready": alerts_ready,
+                "paused": False,
+                "reason": "research_timeout",
+            }
         except MrktAuthError as exc:
             cooldown_until = exc.cooldown_until.isoformat() if exc.cooldown_until else None
             ResearchRunRepository().add("mrkt", "paused", f"auth cooldown: {exc}")
